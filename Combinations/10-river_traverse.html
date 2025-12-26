@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>7x7 Path to Diagonal – Path Tracing</title>
+  <style>
+    body {
+      background: #fafafa;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: system-ui, sans-serif;
+    }
+    canvas {
+      background: white;
+      border: 1px solid #ddd;
+    }
+  </style>
+</head>
+<body>
+<canvas id="game" width="520" height="520"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const GRID_SIZE = 7;
+const CELL = 60;
+const OFFSET = 50;
+
+let pos = { x: 0, y: 0 };
+let frozen = false;
+let path = [{ x: 0, y: 0 }];
+
+function toCanvas(x, y) {
+  return {
+    cx: OFFSET + x * CELL,
+    cy: canvas.height - OFFSET - y * CELL
+  };
+}
+
+function drawGrid() {
+  ctx.strokeStyle = "#ccc";
+  for (let i = 0; i <= GRID_SIZE; i++) {
+    ctx.beginPath();
+    ctx.moveTo(OFFSET + i * CELL, OFFSET);
+    ctx.lineTo(OFFSET + i * CELL, canvas.height - OFFSET);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(OFFSET, OFFSET + i * CELL);
+    ctx.lineTo(canvas.width - OFFSET, OFFSET + i * CELL);
+    ctx.stroke();
+  }
+}
+
+function drawDiagonal() {
+  ctx.strokeStyle = "#4a90e2";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  let a = toCanvas(0, 6);
+  let b = toCanvas(6, 0);
+  ctx.moveTo(a.cx, a.cy);
+  ctx.lineTo(b.cx, b.cy);
+  ctx.stroke();
+
+  for (let x = 0; x <= 6; x++) {
+    let y = 6 - x;
+    let p = toCanvas(x, y);
+    ctx.fillStyle = "#1f4fd8";
+    ctx.beginPath();
+    ctx.arc(p.cx, p.cy, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawAxes() {
+  ctx.fillStyle = "#000";
+  ctx.font = "14px sans-serif";
+
+  for (let i = 0; i <= GRID_SIZE; i++) {
+    let px = OFFSET + i * CELL;
+    ctx.fillText(i, px - 4, canvas.height - OFFSET + 20);
+
+    let py = canvas.height - OFFSET - i * CELL;
+    ctx.fillText(i, OFFSET - 25, py + 5);
+  }
+}
+
+function drawPath() {
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  path.forEach((p, i) => {
+    let c = toCanvas(p.x, p.y);
+    if (i === 0) ctx.moveTo(c.cx, c.cy);
+    else ctx.lineTo(c.cx, c.cy);
+  });
+  ctx.stroke();
+}
+
+function drawDot() {
+  let p = toCanvas(pos.x, pos.y);
+  ctx.fillStyle = "black";
+  ctx.beginPath();
+  ctx.arc(p.cx, p.cy, 6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function checkFreeze() {
+  if (pos.x + pos.y === 6) frozen = true;
+}
+
+function reset() {
+  pos = { x: 0, y: 0 };
+  path = [{ x: 0, y: 0 }];
+  frozen = false;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawGrid();
+  drawAxes();
+  drawDiagonal();
+  drawPath();
+  drawDot();
+}
+
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") {
+    reset();
+    draw();
+    return;
+  }
+  if (frozen) return;
+
+  if (e.key === "ArrowRight" && pos.x < GRID_SIZE) {
+    pos.x += 1;
+    path.push({ ...pos });
+  }
+  if (e.key === "ArrowUp" && pos.y < GRID_SIZE) {
+    pos.y += 1;
+    path.push({ ...pos });
+  }
+
+  checkFreeze();
+  draw();
+});
+
+draw();
+</script>
+</body>
+</html>
+

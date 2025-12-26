@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Distributive Property Minigame</title>
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: white;
+    font-family: Arial, sans-serif;
+    font-size: 2rem;
+  }
+  .expression {
+    display: inline-block;
+    padding: 0.2em 0.5em;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .red { background-color: #ffaaaa; }
+  .blue { background-color: #aaaaff; }
+  .black { background-color: #dddddd; }
+
+  .result {
+    display: inline-block;
+    margin-left: 1em;
+  }
+
+  .part {
+    opacity: 0;
+    transform: translateY(10px);
+    display: inline-block;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .part.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<span id="expr" class="expression">
+  (<span class="red">a</span> + <span class="blue">b</span>) . <span class="black">c</span>
+</span>
+<span id="result" class="expression result">
+  = <span id="part1" class="part"><span class="red">a</span> . <span class="black">c</span></span>
+  <span id="plus" class="part"> + </span>
+  <span id="part2" class="part"><span class="blue">b</span> . <span class="black">c</span></span>
+</span>
+
+<script>
+  const expr = document.getElementById('expr');
+  const part1 = document.getElementById('part1');
+  const plus = document.getElementById('plus');
+  const part2 = document.getElementById('part2');
+
+  expr.addEventListener('click', () => {
+    // Animate a.c
+    part1.classList.add('show');
+    // Animate plus after 0.5s
+    setTimeout(() => plus.classList.add('show'), 500);
+    // Animate b.c after 1s
+    setTimeout(() => part2.classList.add('show'), 1000);
+  });
+</script>
+
+</body>
+</html>
+

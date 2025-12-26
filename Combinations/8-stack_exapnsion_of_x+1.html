@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binomial Simplification</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            font-family: 'Segoe UI', sans-serif;
+            cursor: pointer;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        .main-expression {
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+            transition: all 0.5s ease;
+        }
+
+        .row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        .box {
+            width: 110px;
+            height: 140px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.4s ease;
+            background-color: #fafafa;
+        }
+
+        .box.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .columnar { text-align: center; }
+        .selected { font-weight: bold; }
+        .not-selected { opacity: 0.2; }
+
+        .result-text {
+            margin-top: 10px;
+            border-top: 1px solid #ddd;
+            padding-top: 5px;
+            font-weight: bold;
+            color: #2e7d32;
+        }
+
+        /* Final Result Styling */
+        #final-result {
+            position: absolute;
+            font-size: 3rem;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+        }
+
+        #final-result.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 30px;
+            color: #888;
+        }
+
+        .highlight-2 {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body onclick="handleInteraction()">
+
+    <div id="top-expr" class="main-expression">(x + 1)(x + 1)</div>
+
+    <div id="box-row" class="row">
+        <div style="font-size: 2.5rem">=</div>
+        
+        <div class="box" id="box0">
+            <div class="columnar">
+                <div>(<span class="selected">x</span> + <span class="not-selected">1</span>)</div>
+                <div>(<span class="selected">x</span> + <span class="not-selected">1</span>)</div>
+                <div class="result-text">x&sup2;</div>
+            </div>
+        </div>
+
+        <div class="box" id="box1">
+            <div class="columnar">
+                <div>(<span class="selected">x</span> + <span class="not-selected">1</span>)</div>
+                <div>(<span class="not-selected">x</span> + <span class="selected">1</span>)</div>
+                <div class="result-text">x</div>
+            </div>
+        </div>
+
+        <div class="box" id="box2">
+            <div class="columnar">
+                <div>(<span class="not-selected">x</span> + <span class="selected">1</span>)</div>
+                <div>(<span class="selected">x</span> + <span class="not-selected">1</span>)</div>
+                <div class="result-text">x</div>
+            </div>
+        </div>
+
+        <div class="box" id="box3">
+            <div class="columnar">
+                <div>(<span class="not-selected">x</span> + <span class="selected">1</span>)</div>
+                <div>(<span class="not-selected">x</span> + <span class="selected">1</span>)</div>
+                <div class="result-text">1</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="final-result">
+        x&sup2; + <span class="highlight-2">2</span>x + 1
+    </div>
+
+    <div class="hint" id="hint">Click to reveal combinations</div>
+
+    <script>
+        let step = 0;
+        const totalBoxes = 4;
+
+        function handleInteraction() {
+            const hint = document.getElementById('hint');
+            const row = document.getElementById('box-row');
+            const topExpr = document.getElementById('top-expr');
+            const finalResult = document.getElementById('final-result');
+
+            if (step < totalBoxes) {
+                // Reveal boxes one by one
+                document.getElementById(`box${step}`).classList.add('revealed');
+                step++;
+                if (step === totalBoxes) {
+                    hint.innerText = "Click to simplify terms";
+                }
+            } else if (step === totalBoxes) {
+                // Collapse and simplify
+                row.style.opacity = "0";
+                row.style.transform = "scale(0.8)";
+                topExpr.style.opacity = "0";
+                
+                setTimeout(() => {
+                    row.style.display = "none";
+                    topExpr.style.display = "none";
+                    finalResult.classList.add('show');
+                    hint.innerText = "The two 'x' terms combined into 2x!";
+                }, 500);
+                
+                step++;
+            }
+        }
+    </script>
+</body>
+</html>

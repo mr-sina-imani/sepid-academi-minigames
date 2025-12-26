@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combinatorics Minigame: Subset Parity (Reveal)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f7f9fc;
+            color: #333;
+        }
+
+        h1 {
+            color: #17a2b8;
+            margin-bottom: 0.5em;
+        }
+
+        p.problem {
+            font-size: 1.1em;
+            max-width: 700px;
+            text-align: center;
+            margin-bottom: 2em;
+            padding: 15px;
+            border: 1px solid #cce5ff;
+            background-color: #e2f2ff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .subset-display {
+            font-size: 1.2em;
+            margin-top: 15px;
+            min-height: 40px;
+        }
+        
+        .subset-box {
+            display: inline-block;
+            padding: 8px 15px;
+            border: 2px solid #28a745;
+            border-radius: 5px;
+            background-color: #f0fff0;
+            font-weight: bold;
+        }
+
+        .binary-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            font-size: 2em;
+        }
+
+        .digit-placeholder {
+            width: 50px;
+            height: 70px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+            transition: border-color 0.3s, background-color 0.3s;
+            font-weight: bold;
+            cursor: default; /* Default cursor for most states */
+        }
+
+        .digit-label {
+            font-size: 0.4em;
+            color: #6c757d;
+            position: absolute;
+            top: 5px;
+        }
+
+        .digit-wrapper {
+            position: relative;
+        }
+
+        /* State Styles */
+        .active {
+            border-color: #17a2b8;
+            background-color: #f0f8ff;
+        }
+        
+        /* Spoiler/Scratch-Off Style for the Forced Choice */
+        .spoiler {
+            background-color: #555;
+            color: #555; /* Text color matches background to hide */
+            border-color: #ffc107;
+            text-shadow: none;
+            cursor: pointer !important; /* Change cursor to indicate clickability */
+            font-family: monospace;
+            font-size: 2.5em;
+        }
+        
+        .spoiler-revealed {
+            background-color: #ffc107; /* Revealed background color */
+            color: #333; /* Revealed text color */
+            border-color: #ffc107;
+            cursor: default !important;
+        }
+
+        .message {
+            font-size: 1.1em;
+            color: #17a2b8;
+            font-weight: bold;
+        }
+
+        .message.success {
+            color: #28a745;
+        }
+
+        .instruction {
+            margin-top: 1em;
+            padding: 10px;
+            background-color: #eee;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .instruction strong {
+            color: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Subset Parity Minigame</h1>
+
+    <div class="binary-container" id="binary-container">
+        </div>
+
+    <div class="subset-display">
+<span id="subset-output" class="subset-box">{}</span>
+    </div>
+    <script>
+        const SET_SIZE = 5;
+        const ELEMENTS = [1, 2, 3, 4, 5];
+        const TARGET_PARITY = 0; // 0 for even size
+
+        const binaryContainerEl = document.getElementById('binary-container');
+        const subsetOutputEl = document.getElementById('subset-output');
+
+        let state = {
+            string: [], // Stores the first 4 binary digits
+            lastDigit: null, // The auto-calculated, forced 5th digit
+            position: 1, // Current position being filled (1 to 5)
+            onesCount: 0, // Number of '1's entered so far
+            isRevealed: false // Flag for the last digit spoiler
+        };
+
+        // --- Core Logic ---
+
+        /**
+         * Calculates the required value for the last digit (the forced choice)
+         * to achieve the target parity (even=0).
+         * @returns {number} The required last digit (0 or 1).
+         */
+        function calculateForcedLastDigit() {
+            // Since Target Parity is 0 (Even), we need the last digit to match the current parity.
+            // If current '1's is EVEN (0), we need D5 = 0.
+            // If current '1's is ODD (1), we need D5 = 1.
+            return state.onesCount % 2; 
+        }
+
+        /**
+         * Recalculates the onesCount from the string for resilience and updates the forced digit.
+         */
+        function updateForcedDigit() {
+            state.onesCount = state.string.filter(d => d === 1).length;
+            state.lastDigit = calculateForcedLastDigit();
+        }
+        
+        function revealLastDigit() {
+            if (state.position > SET_SIZE - 1 && !state.isRevealed) {
+                state.isRevealed = true;
+                state.position++; // Moves to phase 6 (Complete)
+                updateUI();
+            }
+        }
+
+        // --- UI Updates ---
+
+        function renderDigitsAndSubset() {
+            binaryContainerEl.innerHTML = '';
+            let currentSubset = [];
+            const fullString = state.string.concat(state.isRevealed ? state.lastDigit : []);
+
+            for (let i = 0; i < SET_SIZE; i++) {
+                const digitWrapper = document.createElement('div');
+                digitWrapper.className = 'digit-wrapper';
+                
+                const digitEl = document.createElement('div');
+                digitEl.className = 'digit-placeholder';
+                
+                const labelEl = document.createElement('div');
+                labelEl.className = 'digit-label';
+                labelEl.textContent = `${ELEMENTS[i]}`;
+                digitWrapper.appendChild(labelEl);
+
+                const digitValue = fullString[i];
+                
+                // Set content based on phase
+                if (i < SET_SIZE - 1) {
+                    // Digits 1-4: Entered value or placeholder
+                    digitEl.textContent = state.string[i] !== undefined ? state.string[i] : '_';
+                    if (state.string[i] === 1) currentSubset.push(ELEMENTS[i]);
+
+                    // Highlight the active position
+                    if (state.position === i + 1) {
+                        digitEl.classList.add('active');
+                    }
+                } else {
+                    // Digit 5: Forced choice
+                    if (!state.isRevealed) {
+                        // HIDDEN SPOILER
+                        digitEl.classList.add('spoiler');
+                        digitEl.textContent = ''; // Placeholder text for the spoiler
+                        digitEl.onclick = revealLastDigit; // Attach click handler
+                        
+                        // Current state is 4 inputs completed, waiting for reveal
+                        if (state.position === SET_SIZE) { 
+                           digitEl.style.cursor = 'pointer'; // Ensure pointer cursor is visible
+                        }
+                        
+                    } else {
+                        // REVEALED
+                        digitEl.classList.add('spoiler-revealed');
+                        digitEl.textContent = state.lastDigit;
+                        if (state.lastDigit === 1) currentSubset.push(ELEMENTS[i]);
+                    }
+                }
+                
+                digitWrapper.appendChild(digitEl);
+                binaryContainerEl.appendChild(digitWrapper);
+            }
+
+            // Update subset display (only if revealed, otherwise show subset up to D4)
+            subsetOutputEl.textContent = `{${currentSubset.join(', ')}}`;
+        }
+
+        function updateUI() {
+            renderDigitsAndSubset();
+
+            if (state.position <= SET_SIZE - 1) {
+                // Phase 1 to 4: Free choice
+            } else if (state.position === SET_SIZE) {
+                // Phase 5: Waiting for reveal
+                
+            } else {
+                // Game Complete (phase 6)
+
+            }
+        }
+
+        function resetGame() {
+            state.string = [];
+            state.lastDigit = null;
+            state.position = 1;
+            state.onesCount = 0;
+            state.isRevealed = false;
+            updateUI();
+        }
+
+        // --- Event Listener ---
+
+        document.addEventListener('keydown', (event) => {
+            const key = event.key;
+
+            // Global reset on Spacebar
+            if (key === ' ') {
+                event.preventDefault(); 
+                resetGame();
+                return;
+            }
+
+            // Reveal on Enter
+            if (key === 'Enter' && state.position === SET_SIZE && !state.isRevealed) {
+                event.preventDefault(); 
+                revealLastDigit();
+                return;
+            }
+
+            // Check if the key is '0' or '1'
+            const digit = parseInt(key);
+            if (digit !== 0 && digit !== 1) {
+                return; 
+            }
+
+            if (state.position <= SET_SIZE - 1) {
+                // Phase 1-4: Free Choice
+                state.string.push(digit);
+                state.position++; 
+                
+                // If we just finished digit 4
+                if (state.position === SET_SIZE) {
+                    updateForcedDigit(); // Calculate D5 before updating UI
+                }
+
+                updateUI();
+            }
+        });
+
+        // Initialize the game state when the page loads
+        resetGame();
+
+    </script>
+
+</body>
+</html>

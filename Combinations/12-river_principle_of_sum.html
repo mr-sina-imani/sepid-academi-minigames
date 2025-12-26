@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Grid Paths to a Selected Diagonal Point</title>
+  <style>
+    :root{
+      --bg:#f6f8fb;
+      --grid:#2f3a4a;
+      --line:#2b7be3;
+      --highlight:#154a9e;
+      --accent:#0f1724;
+      --rect:rgba(255, 215, 0, 0.35); /* bright yellow */
+    }
+    html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,var(--bg),#eef2f7);color:var(--accent);}    
+    .wrap{max-width:820px;margin:28px auto;padding:20px;background:#fff;border-radius:12px;box-shadow:0 6px 30px rgba(2,6,23,0.15);}    
+    h1{font-size:18px;margin:0 0 10px 0}
+    p{font-size:13px;color:#445;margin:0 0 12px 0}
+    svg{display:block;margin:auto;outline:none}
+    .note{font-size:12px;color:#555;margin-top:8px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Select a destination on <code>x + y = 6</code></h1>
+  <p>Click a dark blue point to choose a destination. The corresponding sub-grid lights up. Then use <strong>→</strong> and <strong>↑</strong> to trace a path that must end exactly at that point. Press <strong>Space</strong> to reset.</p>
+  <div id="game"></div>
+  <div class="note">The highlighted rectangle represents a standard grid path problem whose number of paths equals a binomial coefficient.</div>
+</div>
+
+<script>
+(function(){
+  const gridSize = 7;
+  const cell = 56;
+  const padding = 28;
+  const width = gridSize * cell;
+  const height = gridSize * cell;
+
+  let pos = {x:0,y:0};
+  let path = [{x:0,y:0}];
+  let frozen = false;
+  let target = null; // {x,y}
+
+  const mapX = x => padding + x * cell;
+  const mapY = y => padding + (height - y * cell);
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg');
+  svg.setAttribute('width', width + padding*2);
+  svg.setAttribute('height', height + padding*2);
+  svg.setAttribute('viewBox', `0 0 ${width+padding*2} ${height+padding*2}`);
+  svg.setAttribute('tabindex','0');
+
+  const background = document.createElementNS(svgNS,'rect');
+  background.setAttribute('x',0);
+  background.setAttribute('y',0);
+  background.setAttribute('width',width+padding*2);
+  background.setAttribute('height',height+padding*2);
+  background.setAttribute('fill','transparent');
+  svg.appendChild(background);
+
+  const highlightRect = document.createElementNS(svgNS,'rect');
+  highlightRect.setAttribute('fill','var(--rect)');
+  highlightRect.setAttribute('visibility','hidden');
+  svg.appendChild(highlightRect);
+
+  // degenerate highlight lines (for x=0 or y=0)
+  const highlightLineX = document.createElementNS(svgNS,'line');
+  const highlightLineY = document.createElementNS(svgNS,'line');
+  [highlightLineX, highlightLineY].forEach(l=>{
+    l.setAttribute('stroke','var(--rect)');
+    l.setAttribute('stroke-width','8');
+    l.setAttribute('stroke-linecap','round');
+    l.setAttribute('visibility','hidden');
+    svg.appendChild(l);
+  });
+
+  // grid lines
+  for(let i=0;i<=gridSize;i++){
+    const v = document.createElementNS(svgNS,'line');
+    v.setAttribute('x1',mapX(i)); v.setAttribute('y1',mapY(0));
+    v.setAttribute('x2',mapX(i)); v.setAttribute('y2',mapY(gridSize));
+    v.setAttribute('stroke','var(--grid)'); v.setAttribute('stroke-opacity','0.25');
+    svg.appendChild(v);
+
+    const h = document.createElementNS(svgNS,'line');
+    h.setAttribute('x1',mapX(0)); h.setAttribute('y1',mapY(i));
+    h.setAttribute('x2',mapX(gridSize)); h.setAttribute('y2',mapY(i));
+    h.setAttribute('stroke','var(--grid)'); h.setAttribute('stroke-opacity','0.25');
+    svg.appendChild(h);
+  }
+
+  // diagonal
+  const diag = document.createElementNS(svgNS,'line');
+  diag.setAttribute('x1',mapX(0)); diag.setAttribute('y1',mapY(6));
+  diag.setAttribute('x2',mapX(6)); diag.setAttribute('y2',mapY(0));
+  diag.setAttribute('stroke','var(--line)');
+  diag.setAttribute('stroke-width','4');
+  diag.setAttribute('stroke-linecap','round');
+  svg.appendChild(diag);
+
+  // diagonal targets
+  const targetGroup = document.createElementNS(svgNS,'g');
+  for(let x=0;x<=6;x++){
+    const y = 6-x;
+    const c = document.createElementNS(svgNS,'circle');
+    c.setAttribute('cx',mapX(x));
+    c.setAttribute('cy',mapY(y));
+    c.setAttribute('r',7);
+    c.setAttribute('fill','var(--highlight)');
+    c.style.cursor = 'pointer';
+
+    c.addEventListener('click',()=>{
+      target = {x,y};
+      reset();
+      updateHighlight();
+    });
+
+    targetGroup.appendChild(c);
+  }
+  svg.appendChild(targetGroup);
+
+  // path polyline
+  const pathLine = document.createElementNS(svgNS,'polyline');
+  pathLine.setAttribute('fill','none');
+  pathLine.setAttribute('stroke','#000');
+  pathLine.setAttribute('stroke-width','2');
+  svg.appendChild(pathLine);
+
+  // moving dot
+  const dot = document.createElementNS(svgNS,'circle');
+  dot.setAttribute('r',7);
+  dot.setAttribute('fill','#000');
+  svg.appendChild(dot);
+
+  function updateHighlight(){
+    highlightRect.setAttribute('visibility','hidden');
+    highlightLineX.setAttribute('visibility','hidden');
+    highlightLineY.setAttribute('visibility','hidden');
+
+    if(!target) return;
+
+    // non-degenerate rectangle
+    if(target.x > 0 && target.y > 0){
+      highlightRect.setAttribute('x', mapX(0));
+      highlightRect.setAttribute('y', mapY(target.y));
+      highlightRect.setAttribute('width', target.x * cell);
+      highlightRect.setAttribute('height', target.y * cell);
+      highlightRect.setAttribute('visibility','visible');
+      return;
+    }
+
+    // degenerate cases
+    if(target.y === 0){
+      // horizontal segment from (0,0) to (x,0)
+      highlightLineX.setAttribute('x1', mapX(0));
+      highlightLineX.setAttribute('y1', mapY(0));
+      highlightLineX.setAttribute('x2', mapX(target.x));
+      highlightLineX.setAttribute('y2', mapY(0));
+      highlightLineX.setAttribute('visibility','visible');
+    }
+
+    if(target.x === 0){
+      // vertical segment from (0,0) to (0,y)
+      highlightLineY.setAttribute('x1', mapX(0));
+      highlightLineY.setAttribute('y1', mapY(0));
+      highlightLineY.setAttribute('x2', mapX(0));
+      highlightLineY.setAttribute('y2', mapY(target.y));
+      highlightLineY.setAttribute('visibility','visible');
+    }
+  }
+
+  function updatePath(){
+    const pts = path.map(p => `${mapX(p.x)},${mapY(p.y)}`).join(' ');
+    pathLine.setAttribute('points', pts);
+  }
+
+  function render(){
+    dot.setAttribute('cx', mapX(pos.x));
+    dot.setAttribute('cy', mapY(pos.y));
+    updatePath();
+  }
+
+  function reset(){
+    pos = {x:0,y:0};
+    path = [{x:0,y:0}];
+    frozen = false;
+    render();
+  }
+
+  document.addEventListener('keydown',(e)=>{
+    if(e.code === 'Space'){
+      reset();
+      return;
+    }
+    if(frozen || !target) return;
+
+    if(e.key === 'ArrowRight' && pos.x < target.x){ pos.x++; }
+    if(e.key === 'ArrowUp' && pos.y < target.y){ pos.y++; }
+
+    path.push({x:pos.x,y:pos.y});
+    render();
+
+    if(pos.x === target.x && pos.y === target.y){
+      frozen = true;
+    }
+  });
+
+  // basic sanity tests (run once in console)
+  function runTests(){
+    // non-degenerate
+    target = {x:3,y:3}; updateHighlight();
+    console.assert(highlightRect.getAttribute('visibility')==='visible','Rect should be visible for non-degenerate');
+
+    // y=0 degenerate
+    target = {x:6,y:0}; updateHighlight();
+    console.assert(highlightLineX.getAttribute('visibility')==='visible','Horizontal line should be visible when y=0');
+
+    // x=0 degenerate
+    target = {x:0,y:6}; updateHighlight();
+    console.assert(highlightLineY.getAttribute('visibility')==='visible','Vertical line should be visible when x=0');
+
+    target = null; updateHighlight();
+    console.assert(highlightRect.getAttribute('visibility')==='hidden','Nothing visible when no target');
+  }
+  runTests();
+
+  render();
+  document.getElementById('game').appendChild(svg);
+})();
+</script>
+</body>
+</html>
+

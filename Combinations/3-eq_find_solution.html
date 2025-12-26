@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Integer Equation Minigame</title>
+  <style>
+    /* LaTeX-like typography */
+    @font-face{
+      font-family: "Latin Modern Math";
+      src: local("Latin Modern Math"), local("LM Math");
+      font-display: swap;
+    }
+    @font-face{
+      font-family: "STIX Two Text";
+      src: local("STIX Two Text");
+      font-display: swap;
+    }
+
+    :root{
+      --ok:#16a34a;
+      --bad:#dc2626;
+      --silver-1:#f3f4f6;
+      --silver-2:#e5e7eb;
+      --silver-3:#d1d5db;
+      font-family: "STIX Two Text", "Latin Modern Math", "Times New Roman", serif;
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      background:#ffffff;
+      color:#111827;
+    }
+
+    .wrap{max-width:900px;margin:32px auto;padding:16px}
+
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+    .equation-title{font-size:28px}
+
+    button{
+      background:#ffffff;
+      border:1px solid var(--silver-3);
+      padding:6px 12px;
+      border-radius:6px;
+      cursor:pointer;
+      font-family:inherit;
+    }
+
+    .board{display:flex;flex-direction:column;gap:24px}
+
+    .top{
+      text-align:center;
+      font-size:24px;
+    }
+
+    .math{font-family:"Latin Modern Math","STIX Two Text",serif}
+    .math sub{font-size:0.65em;vertical-align:-0.2em}
+
+    .bottom{display:flex;gap:24px}
+
+    .column{
+      flex:1;
+      background:linear-gradient(180deg,var(--silver-1),var(--silver-2));
+      border-radius:10px;
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:12px;
+    }
+
+    .col-title{
+      font-variant:small-caps;
+      letter-spacing:0.06em;
+    }
+
+    .placeholders{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      width:100%;
+      align-items:center;
+    }
+
+    .item{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:10px;
+      width:100%;
+      max-width:240px;
+      padding:10px;
+      background:var(--silver-2);
+      border:1px solid var(--silver-3);
+      border-radius:6px;
+      cursor:pointer;
+    }
+
+    .label,.value{
+      font-size:18px;
+      text-align:center;
+    }
+
+    .value{
+      min-width:48px;
+    }
+
+    .value.empty{opacity:0.5}
+    .value.active{outline:1.5px dashed #9ca3af;border-radius:4px}
+    .value.correct{color:var(--ok)}
+    .value.incorrect{color:var(--bad)}
+
+    @media (max-width:720px){
+      .bottom{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="equation-title">Integer equation</div>
+      <button id="resetAll">Reset</button>
+    </header>
+
+    <div class="board">
+      <div class="top">
+        <span class="math">x<sub>1</sub> + x<sub>2</sub> + x<sub>3</sub> + x<sub>4</sub> = 15</span>
+      </div>
+
+      <div class="bottom">
+        <div class="column" data-col="0">
+          <div class="col-title">Solution A</div>
+          <div class="placeholders"></div>
+        </div>
+        <div class="column" data-col="1">
+          <div class="col-title">Solution B</div>
+          <div class="placeholders"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const K = 4;
+      const N = 15;
+      let active = null;
+
+      const columns = document.querySelectorAll('.column');
+
+      columns.forEach(col => {
+        const placeholders = col.querySelector('.placeholders');
+        for (let i = 0; i < K; i++){
+          const item = document.createElement('div');
+          item.className = 'item';
+          item.tabIndex = 0;
+          item.innerHTML = `<div class="label math">x<sub>${i+1}</sub> =</div><div class="value empty math" data-col="${col.dataset.col}"></div>`;
+          placeholders.appendChild(item);
+
+          const value = item.querySelector('.value');
+          item.addEventListener('click', ()=>setActive(value));
+          item.addEventListener('focus', ()=>setActive(value));
+        }
+      });
+
+      function setActive(v){
+        if (active) active.classList.remove('active');
+        active = v;
+        if (active) active.classList.add('active');
+        clearColumnFeedback(v.dataset.col);
+      }
+
+      document.addEventListener('click', e => {
+        if (!e.target.closest('.item') && active){
+          active.classList.remove('active');
+          active = null;
+        }
+      });
+
+      document.addEventListener('keydown', e => {
+        if (!active) return;
+        if (/^\d$/.test(e.key)){
+          e.preventDefault();
+          active.classList.remove('empty');
+          active.textContent += e.key;
+          runFeedback(active.dataset.col);
+        } else if (e.key === 'Backspace'){
+          e.preventDefault();
+          active.textContent = active.textContent.slice(0,-1);
+          if (active.textContent === '') active.classList.add('empty');
+          runFeedback(active.dataset.col);
+        } else if (e.key === 'Enter' || e.key === 'Escape'){
+          active.classList.remove('active');
+          active = null;
+        }
+      });
+
+      function runFeedback(colIndex){
+        const col = document.querySelector(`.column[data-col="${colIndex}"]`);
+        const values = Array.from(col.querySelectorAll('.value')).map(v => v.textContent === '' ? null : +v.textContent);
+        const spans = col.querySelectorAll('.value');
+        spans.forEach(s=>s.classList.remove('correct','incorrect'));
+        if (values.some(v=>v===null)) return;
+        const sum = values.reduce((a,b)=>a+b,0);
+        spans.forEach(s=>s.classList.add(sum===N?'correct':'incorrect'));
+      }
+
+      function clearColumnFeedback(colIndex){
+        const col = document.querySelector(`.column[data-col="${colIndex}"]`);
+        col.querySelectorAll('.value').forEach(v=>v.classList.remove('correct','incorrect'));
+      }
+
+      document.getElementById('resetAll').addEventListener('click', () => {
+        document.querySelectorAll('.value').forEach(v => {
+          v.textContent = '';
+          v.classList.remove('correct','incorrect','active');
+          v.classList.add('empty');
+        });
+        active = null;
+      });
+    });
+  </script>
+</body>
+</html>
+

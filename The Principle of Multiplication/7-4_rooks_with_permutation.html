@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4-Rooks Permutation Challenge</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --board-border: #333;
+            --cell-white: #eeeed2;
+            --cell-black: #769656;
+            --highlight-color: #ff4444; 
+            
+            /* Color Codes for repeated numbers (columns) */
+            --color-1: #ff4444; /* Red */
+            --color-2: #6a0c0c; /* Orange */
+            --color-3: #da7700; /* Yellow-Orange */
+            --color-4: #740068; /* Green */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { margin-bottom: 10px; color: #333; }
+        p { color: #555; margin-bottom: 20px; text-align: center; }
+
+        /* Game Container */
+        .game-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        /* The Board */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(4, 80px);
+            grid-template-rows: repeat(4, 80px);
+            border: 5px solid var(--board-border);
+            position: relative;
+            user-select: none;
+        }
+
+        /* Board Cells */
+        .cell {
+            width: 80px;
+            height: 80px;
+            position: relative;
+        }
+
+        .cell.white { background-color: var(--cell-white); }
+        .cell.black { background-color: var(--cell-black); }
+
+        /* Rook Styling (now positioned absolutely within its row) */
+        .rook {
+            font-size: 50px;
+            line-height: 80px;
+            text-align: center;
+            width: 80px;
+            height: 80px;
+            position: absolute;
+            top: 0;
+            /* Start Rooks off-board (column -1) */
+            left: -80px; 
+            transition: left 0.3s ease-out; /* Smooth movement */
+            pointer-events: none;
+            z-index: 5;
+            font-weight: bold;
+        }
+        
+        /* Highlight styles for conflict */
+        .rook.conflict {
+            border-radius: 50%;
+            box-shadow: 0 0 10px 4px;
+        }
+        .rook.conflict-1 { color: var(--color-1); box-shadow-color: var(--color-1); }
+        .rook.conflict-2 { color: var(--color-2); box-shadow-color: var(--color-2); }
+        .rook.conflict-3 { color: var(--color-3); box-shadow-color: var(--color-3); }
+        .rook.conflict-4 { color: var(--color-4); box-shadow-color: var(--color-4); }
+
+        /* Permutation Input Display */
+        .permutation-display {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .code-slot {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #fff;
+            border-radius: 5px;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        
+        .code-slot.active { border-color: #007bff; background-color: #e0f0ff; }
+        
+        /* Feedback styles for repeated code numbers */
+        .code-slot.conflict-1 { color: var(--color-1); border-color: var(--color-1); }
+        .code-slot.conflict-2 { color: var(--color-2); border-color: var(--color-2); }
+        .code-slot.conflict-3 { color: var(--color-3); border-color: var(--color-3); }
+        .code-slot.conflict-4 { color: var(--color-4); border-color: var(--color-4); }
+
+
+        /* Feedback Message */
+        #message {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            height: 1.5em; 
+        }
+        .success { color: green; }
+        .failure { color: red; }
+    </style>
+</head>
+<body onkeydown="handleKeyPress(event)">
+
+    <h1>4-Rooks Permutation Challenge</h1>
+    <p>
+        The position is defined by a 4-digit code (a sequence of columns).<br>
+        **Input the column numbers (1, 2, 3, or 4) using your keyboard.**
+    </p>
+
+    <div class="game-container">
+        <div class="board" id="board">
+            </div>
+    </div>
+    
+    <h2>Permutation Code:</h2>
+    <div class="permutation-display" id="permutationDisplay">
+        </div>
+
+    <div id="message"></div>
+    <button onclick="resetGame()" style="margin-top:15px; padding: 8px 16px; cursor:pointer;">Reset</button>
+
+    <script>
+        const boardEl = document.getElementById('board');
+        const displayEl = document.getElementById('permutationDisplay');
+        const messageEl = document.getElementById('message');
+        const n = 4;
+        const cellSize = 80;
+
+        // Game State
+        let currentPermutation = []; // Stores the column index (0 to 3) for each row
+        let currentRow = 0; // The row index (0 to 3) currently being filled
+        
+        // Maps column index (0-3) to CSS conflict class
+        const conflictClasses = ['conflict-1', 'conflict-2', 'conflict-3', 'conflict-4'];
+        
+        // --- Initialization ---
+
+        function initGame() {
+            boardEl.innerHTML = '';
+            displayEl.innerHTML = '';
+            messageEl.textContent = '';
+            currentRow = 0;
+            currentPermutation = [];
+            
+            // 1. Create Board structure (Cells) and Rooks (1 per row)
+            for (let r = 0; r < n; r++) {
+                for (let c = 0; c < n; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.classList.add((r + c) % 2 === 0 ? 'white' : 'black');
+                    boardEl.appendChild(cell);
+                }
+
+                // Create the Rook for this row
+                const rook = document.createElement('div');
+                rook.classList.add('rook');
+                rook.id = `rook-row-${r}`;
+                rook.textContent = '♜';
+                // Initial position: Off-board, correct vertical position
+                rook.style.transform = `translateY(${r * cellSize}px)`; 
+                boardEl.appendChild(rook);
+            }
+
+            // 2. Create Permutation Code Slots
+            for (let i = 0; i < n; i++) {
+                const slot = document.createElement('div');
+                slot.classList.add('code-slot');
+                slot.id = `slot-${i}`;
+                displayEl.appendChild(slot);
+            }
+
+            updateDisplay();
+        }
+        
+        // --- Input Handler ---
+        
+        function handleKeyPress(event) {
+            // Only accept input if we are not finished (currentRow < n)
+            if (currentRow >= n) return; 
+
+            const inputKey = event.key;
+            const colIndex = parseInt(inputKey) - 1; // 1 -> 0, 4 -> 3
+
+            // Check if the input is one of the valid column numbers (1, 2, 3, 4)
+            if (colIndex >= 0 && colIndex < n) {
+                // Record the column index
+                currentPermutation[currentRow] = colIndex; 
+                
+                // Update the visual placement of the Rook
+                placeRook(currentRow, colIndex);
+                
+                // Move to the next row/slot
+                currentRow++;
+                
+                // Update the code display
+                updateDisplay(); 
+
+                // Check game state if all inputs are done
+                if (currentRow === n) {
+                    validatePlacement();
+                }
+            }
+        }
+        
+        // --- Visual Updates ---
+
+        function placeRook(row, col) {
+            const rook = document.getElementById(`rook-row-${row}`);
+            // Move rook from its initial off-board position (left: -80px) to the new column
+            rook.style.left = `${col * cellSize}px`; 
+        }
+
+        function updateDisplay() {
+            // Clear any old feedback first
+            clearFeedback();
+            
+            for (let i = 0; i < n; i++) {
+                const slot = document.getElementById(`slot-${i}`);
+                
+                // 1. Update active state
+                slot.classList.toggle('active', i === currentRow);
+
+                // 2. Update content
+                if (currentPermutation[i] !== undefined) {
+                    slot.textContent = currentPermutation[i] + 1; // Display 1-4
+                } else {
+                    slot.textContent = '';
+                }
+            }
+        }
+        
+        // --- Game Logic and Feedback ---
+
+        function validatePlacement() {
+            // Check for column conflicts (repeated numbers in the permutation)
+            let conflicts = {}; // Key: column index (0-3), Value: array of row indices where it appears
+            currentPermutation.forEach((col, row) => {
+                if (!conflicts[col]) {
+                    conflicts[col] = [];
+                }
+                conflicts[col].push(row);
+            });
+
+            // Identify which columns actually have conflicts (appear more than once)
+            const conflictingColumns = Object.keys(conflicts).filter(col => conflicts[col].length > 1);
+
+            if (conflictingColumns.length === 0) {
+                // Success
+                messageEl.textContent = "Success! The code forms a valid permutation (no shared columns).";
+                messageEl.className = "success";
+            } else {
+                // Failure
+                messageEl.textContent = "Failure! Repeated columns found (code is not a permutation).";
+                messageEl.className = "failure";
+                
+                // Apply color-coded feedback
+                highlightConflicts(conflictingColumns, conflicts);
+            }
+        }
+
+        function highlightConflicts(conflictingColumns, conflictsData) {
+            
+            // Iterate through the conflicting columns and assign a unique color class
+            conflictingColumns.forEach((colIndexStr, index) => {
+                const colIndex = parseInt(colIndexStr);
+                const colorClass = conflictClasses[colIndex]; // e.g., 'conflict-1'
+                
+                // 1. Highlight the code number slots
+                conflictsData[colIndex].forEach(row => {
+                    const slot = document.getElementById(`slot-${row}`);
+                    slot.classList.add(colorClass);
+                });
+
+                // 2. Highlight the Rooks in the conflicting column
+                conflictsData[colIndex].forEach(row => {
+                    const rook = document.getElementById(`rook-row-${row}`);
+                    rook.classList.add('conflict', colorClass);
+                });
+            });
+        }
+        
+        function clearFeedback() {
+            messageEl.textContent = '';
+            messageEl.className = '';
+            
+            // Remove conflict classes from all slots and rooks
+            document.querySelectorAll('.code-slot').forEach(slot => {
+                slot.classList.remove(...conflictClasses);
+            });
+            document.querySelectorAll('.rook').forEach(rook => {
+                rook.classList.remove('conflict', ...conflictClasses);
+            });
+        }
+
+        function resetGame() {
+            initGame();
+        }
+
+        // Start the game
+        initGame();
+
+    </script>
+</body>
+</html>

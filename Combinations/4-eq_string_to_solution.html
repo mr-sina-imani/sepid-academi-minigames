@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stars and Separators – Strings to Solutions</title>
+  <style>
+    @font-face{
+      font-family:"Latin Modern Math";
+      src:local("Latin Modern Math"),local("LM Math");
+      font-display:swap;
+    }
+    @font-face{
+      font-family:"STIX Two Text";
+      src:local("STIX Two Text");
+      font-display:swap;
+    }
+
+    :root{
+      --silver-1:#f3f4f6;
+      --silver-2:#e5e7eb;
+      --silver-3:#d1d5db;
+      font-family:"STIX Two Text","Latin Modern Math","Times New Roman",serif;
+    }
+
+    html,body{margin:0;background:#ffffff;color:#111827}
+
+    .wrap{max-width:900px;margin:32px auto;padding:16px}
+
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+    .equation-title{font-size:26px}
+
+    button{background:#ffffff;border:1px solid var(--silver-3);padding:6px 12px;border-radius:6px;cursor:pointer;font-family:inherit}
+
+    .top{text-align:center;font-size:24px;margin-bottom:24px}
+    .math{font-family:"Latin Modern Math","STIX Two Text",serif}
+    .math sub{vertical-align:sub; font-size:0.7em}
+
+    .bottom{display:flex;gap:24px}
+
+    .column{
+      flex:1;
+      background:linear-gradient(180deg,var(--silver-1),var(--silver-2));
+      border-radius:10px;
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:16px;
+    }
+
+    .col-title{font-variant:small-caps;letter-spacing:0.06em}
+
+    /* STRING AREA */
+    .string-container{
+      display:flex;
+      flex-wrap:nowrap;
+      gap:4px;
+      justify-content:center;
+      padding:12px;
+      background:#ffffff;
+      border:1px solid var(--silver-3);
+      border-radius:8px;
+      overflow-x:auto;
+      min-height:48px;
+    }
+
+    .char{
+      width:20px;
+      height:28px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid var(--silver-3);
+      border-radius:6px;
+      background:#ffffff;
+      cursor:grab;
+      font-size:16px;
+      user-select:none;
+    }
+
+    .char.dragging{opacity:0.4}
+
+    /* SOLUTION */
+    .solution{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .sol-item{
+      display:flex;
+      justify-content:center;
+      gap:8px;
+      font-size:18px;
+    }
+
+    @media (max-width:720px){.bottom{flex-direction:column}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="equation-title">Stars and separators</div>
+    <button id="reshuffle">New string</button>
+  </header>
+
+  <div class="top">
+    <span class="math">x<sub>1</sub> + x<sub>2</sub> + x<sub>3</sub> + x<sub>4</sub> = 15</span>
+  </div>
+
+  <div class="bottom">
+    <div class="column">
+      <div class="col-title">String representation</div>
+      <div class="string-container" id="stringContainer"></div>
+    </div>
+
+    <div class="column">
+      <div class="col-title">Corresponding solution</div>
+      <div class="solution" id="solution"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const N = 15;
+  const K = 4;
+  const container = document.getElementById('stringContainer');
+  const solutionEl = document.getElementById('solution');
+
+  let chars = [];
+
+  function randomString(){
+    chars = Array(N).fill('1').concat(Array(K-1).fill('S'));
+    for (let i = chars.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+    renderString();
+    updateSolution();
+  }
+
+  function renderString(){
+    container.innerHTML = '';
+    chars.forEach((c, i) => {
+      const d = document.createElement('div');
+      d.className = 'char math';
+      d.textContent = c;
+      d.draggable = true;
+      d.dataset.index = i;
+
+      d.addEventListener('dragstart', e => {
+        d.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', i);
+      });
+
+      d.addEventListener('dragend', () => d.classList.remove('dragging'));
+      d.addEventListener('dragover', e => e.preventDefault());
+
+      d.addEventListener('drop', e => {
+        e.preventDefault();
+        const from = +e.dataTransfer.getData('text/plain');
+        const to = +d.dataset.index;
+        if (from === to) return;
+        const [moved] = chars.splice(from, 1);
+        chars.splice(to, 0, moved);
+        renderString();
+        updateSolution();
+      });
+
+      container.appendChild(d);
+    });
+  }
+
+  function updateSolution(){
+    const blocks = chars.join('').split('S');
+    solutionEl.innerHTML = '';
+    for (let i = 0; i < K; i++){
+      const val = blocks[i] ? blocks[i].length : 0;
+      const row = document.createElement('div');
+      row.className = 'sol-item math';
+      row.innerHTML = `<span class="math">x<sub>${i+1}</sub> = ${val}</span>`;
+      solutionEl.appendChild(row);
+    }
+  }
+
+  document.getElementById('reshuffle').addEventListener('click', randomString);
+  randomString();
+});
+</script>
+</body>
+</html>
+

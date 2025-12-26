@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binomial Selection Minigame</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .main-expression {
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+        }
+
+        .row {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .equal-sign {
+            font-size: 2.5rem;
+            margin-right: 10px;
+        }
+
+        .box {
+            width: 120px;
+            height: 150px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.4s ease;
+            background-color: #fafafa;
+        }
+
+        .box.revealed {
+            opacity: 1;
+            transform: scale(1);
+            border-style: solid;
+            border-color: #333;
+        }
+
+        .columnar {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            text-align: center;
+        }
+
+        /* Styling for selection states */
+        .term { transition: all 0.3s; }
+        .selected { font-weight: bold; opacity: 1; color: black; font-size: 1.4rem; }
+        .not-selected { opacity: 0.2; }
+
+        .result-text {
+            margin-top: 15px;
+            border-top: 1px solid #ddd;
+            padding-top: 5px;
+            font-weight: bold;
+            color: #d32f2f; /* Red to highlight the product */
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 30px;
+            color: #888;
+        }
+    </style>
+</head>
+<body onclick="revealNext()">
+
+    <div class="main-expression">
+        (2x + 3)(x + 1)
+    </div>
+
+    <div class="row">
+        <div class="equal-sign">=</div>
+        
+        <div class="box" id="box0">
+            <div class="columnar">
+                <div>(<span class="term selected">2x</span> + <span class="term not-selected">3</span>)</div>
+                <div>(<span class="term selected">x</span> + <span class="term not-selected">1</span>)</div>
+                <div class="result-text">2x &middot; x</div>
+            </div>
+        </div>
+
+        <div class="box" id="box1">
+            <div class="columnar">
+                <div>(<span class="term selected">2x</span> + <span class="term not-selected">3</span>)</div>
+                <div>(<span class="term not-selected">x</span> + <span class="term selected">1</span>)</div>
+                <div class="result-text">2x &middot; 1</div>
+            </div>
+        </div>
+
+        <div class="box" id="box2">
+            <div class="columnar">
+                <div>(<span class="term not-selected">2x</span> + <span class="term selected">3</span>)</div>
+                <div>(<span class="term selected">x</span> + <span class="term not-selected">1</span>)</div>
+                <div class="result-text">3 &middot; x</div>
+            </div>
+        </div>
+
+        <div class="box" id="box3">
+            <div class="columnar">
+                <div>(<span class="term not-selected">2x</span> + <span class="term selected">3</span>)</div>
+                <div>(<span class="term not-selected">x</span> + <span class="term selected">1</span>)</div>
+                <div class="result-text">3 &middot; 1</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="hint" id="hint">Click to reveal the next combination</div>
+
+    <script>
+        let currentBox = 0;
+        const totalBoxes = 4;
+
+        function revealNext() {
+            if (currentBox < totalBoxes) {
+                const box = document.getElementById(`box${currentBox}`);
+                box.classList.add('revealed');
+                currentBox++;
+                
+                if (currentBox === totalBoxes) {
+                    document.getElementById('hint').innerText = "All combinations shown!";
+                }
+            }
+        }
+    </script>
+</body>
+</html>

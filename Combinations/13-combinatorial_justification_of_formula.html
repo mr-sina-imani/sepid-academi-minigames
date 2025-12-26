@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permutation Visualizer</title>
+    <style>
+        :root {
+            --card-width: 80px;
+            --card-height: 110px;
+            --gap: 10px;
+            --color-bg: #f8fafc;
+            --color-card-bg: #ffffff;
+            --color-card-border: #e2e8f0;
+            --color-text: #475569;
+            --color-select-bg: #eff6ff;
+            --color-select-border: #bfdbfe;
+            --color-select-text: #2563eb;
+            --color-error-bg: #fef2f2;
+            --color-error-border: #fca5a5;
+            --color-error-text: #dc2626;
+            --color-success-bg: #dcfce7;
+            --color-success-text: #166534;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none; /* Prevent text selection while dragging */
+            -webkit-user-select: none;
+        }
+
+        .container {
+            max-width: 800px;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h1 { margin-bottom: 0.5rem; color: #1e293b; }
+        .subtitle { color: #64748b; margin-bottom: 1.5rem; }
+
+        .instructions {
+            background: white;
+            border: 1px solid var(--color-card-border);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: left;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        /* --- Game Board --- */
+        .game-board {
+            position: relative;
+            height: 160px; /* buffer for card height + padding */
+            background-color: #e2e8f0;
+            border-radius: 12px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px auto;
+            /* Width calculated dynamically in JS, but fallback here */
+            width: 660px; 
+            display: flex;
+            align-items: center;
+        }
+
+        /* The Vertical Divider */
+        .divider {
+            position: absolute;
+            top: 10px;
+            bottom: 10px;
+            width: 4px;
+            background-color: #94a3b8;
+            border-radius: 2px;
+            opacity: 0.5;
+            z-index: 0;
+            /* Position will be set by JS */
+        }
+
+        .labels {
+            display: flex;
+            justify-content: space-between;
+            width: 660px; /* Matches board */
+            margin: 0 auto;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #94a3b8;
+            letter-spacing: 0.05em;
+        }
+
+        /* --- Cards --- */
+        .card {
+            width: var(--card-width);
+            height: var(--card-height);
+            background-color: var(--color-card-bg);
+            border: 2px solid var(--color-card-border);
+            border-bottom-width: 4px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--color-text);
+            cursor: grab;
+            position: absolute; /* Crucial for custom physics */
+            top: 50%;
+            margin-top: calc(var(--card-height) / -2); /* Center vertically */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            
+            /* Animation Transition */
+            transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s, border-color 0.2s;
+            z-index: 10;
+        }
+
+        .card:active { cursor: grabbing; }
+
+        /* Style for the first 3 cards (Selection) */
+        .card.is-selected-zone {
+            background-color: var(--color-select-bg);
+            border-color: var(--color-select-border);
+            color: var(--color-select-text);
+        }
+
+        /* Visual indicator for misplacement */
+        .card.error {
+            background-color: var(--color-error-bg);
+            border-color: var(--color-error-border);
+            color: var(--color-error-text);
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* While dragging, disable transition so it follows mouse instantly */
+        .card.dragging {
+            transition: none; 
+            z-index: 50;
+            transform: scale(1.1); /* Will be overridden by JS, but good fallback */
+            box-shadow: 0 10px 15px rgba(0,0,0,0.2);
+        }
+
+        /* --- Feedback UI --- */
+        .feedback {
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            font-weight: 500;
+        }
+
+        .msg-success {
+            background-color: var(--color-success-bg);
+            color: var(--color-success-text);
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: popIn 0.3s ease-out;
+        }
+
+        .msg-error {
+            color: var(--color-error-text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button.reset-btn {
+            background: none;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        button.reset-btn:hover { background-color: #e2e8f0; color: #1e293b; }
+
+        /* Animations */
+        @keyframes popIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Visualizing C(n, r)</h1>
+    <p class="subtitle">r! (n-r)! permutations = 1 combination</p>
+
+    <div class="instructions">
+        <strong>Goal:</strong> Shuffle the numbers but keep the "Combination" intact.<br>
+        1. Shuffle the <strong>Blue</strong> group (Selection).<br>
+        2. Shuffle the <strong>White</strong> group (Rest).<br>
+        3. Do <strong>NOT</strong> swap a number between the two groups.
+    </div>
+
+    <div class="labels" id="labelsContainer">
+        <span style="padding-left: 20px;">Selection (r=3)</span>
+        <span style="padding-right: 40px;">Rest (n-r=4)</span>
+    </div>
+
+    <div class="game-board" id="board">
+        </div>
+
+    <div class="feedback" id="feedback"></div>
+
+    <button class="reset-btn" onclick="game.reset()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 1 20.49 15"></path>
+        </svg>
+        Reset / New Permutation
+    </button>
+</div>
+
+<script>
+class PermutationGame {
+    constructor() {
+        // Config
+        this.totalN = 7;
+        this.selectR = 3;
+        this.cardWidth = 80;
+        this.gap = 10;
+        this.boardPadding = 20; // Left padding of board
+
+        // State
+        this.items = [];       // Current order [1, 5, 2...]
+        this.initialLeft = []; // Snapshot of first 3 at start
+        this.initialRight = [];// Snapshot of last 4 at start
+        this.domElements = {}; // Map id -> DOM Element
+
+        // Drag State
+        this.isDragging = false;
+        this.draggedItem = null; // The number being dragged
+        this.dragOffset = 0;     // Offset of mouse within card
+        this.dragStartIndex = 0; 
+        
+        // DOM References
+        this.board = document.getElementById('board');
+        this.feedbackEl = document.getElementById('feedback');
+        this.labelsContainer = document.getElementById('labelsContainer');
+
+        // Setup Layout width dynamically
+        const totalWidth = (this.totalN * this.cardWidth) + ((this.totalN - 1) * this.gap) + (this.boardPadding * 2);
+        this.board.style.width = `${totalWidth}px`;
+        this.labelsContainer.style.width = `${totalWidth}px`;
+
+        // Create Divider
+        const divider = document.createElement('div');
+        divider.className = 'divider';
+        // Calculate position: (3 cards * width) + (2 gaps) + (1/2 gap) + padding
+        const dividerLeft = this.boardPadding + (this.selectR * (this.cardWidth + this.gap)) - (this.gap / 2);
+        divider.style.left = `${dividerLeft}px`;
+        this.board.appendChild(divider);
+
+        // Bind events globally for smooth dragging
+        window.addEventListener('pointermove', (e) => this.onPointerMove(e));
+        window.addEventListener('pointerup', (e) => this.onPointerUp(e));
+
+        this.reset();
+    }
+
+    reset() {
+        // 1. Generate numbers 1..N
+        const base = Array.from({ length: this.totalN }, (_, i) => i + 1);
+        // 2. Shuffle
+        base.sort(() => Math.random() - 0.5);
+        
+        this.items = [...base];
+        this.initialLeft = base.slice(0, this.selectR);
+        this.initialRight = base.slice(this.selectR);
+        
+        // Clear old cards (keep divider)
+        const cards = this.board.querySelectorAll('.card');
+        cards.forEach(c => c.remove());
+        this.domElements = {};
+
+        // 3. Create DOM elements
+        this.items.forEach((num, index) => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.textContent = num;
+            card.dataset.id = num; // identify the number
+            
+            // Initial Style
+            this.updateCardVisuals(card, index, num);
+
+            // Positioning
+            const xPos = this.calculateX(index);
+            card.style.transform = `translate3d(${xPos}px, 0, 0)`;
+
+            // Drag Events
+            card.addEventListener('pointerdown', (e) => this.onPointerDown(e, num));
+
+            this.board.appendChild(card);
+            this.domElements[num] = card;
+        });
+
+        this.checkWinCondition(false); // Clear messages
+    }
+
+    calculateX(index) {
+        return this.boardPadding + (index * (this.cardWidth + this.gap));
+    }
+
+    updateCardVisuals(card, index, num) {
+        // Determine if this slot is in the "Selected" (Left) zone
+        const isSelectedZone = index < this.selectR;
+        
+        // Determine if this number belongs in the Left zone originally
+        const belongsInLeft = this.initialLeft.includes(num);
+
+        // Reset classes
+        card.classList.remove('is-selected-zone', 'error');
+
+        // Apply Zone Styling
+        if (isSelectedZone) {
+            card.classList.add('is-selected-zone');
+        }
+
+        // Apply Error Styling (Logic Check)
+        // Error if: In Left Zone BUT belongs in Right OR In Right Zone BUT belongs in Left
+        const isMisplaced = (isSelectedZone && !belongsInLeft) || (!isSelectedZone && belongsInLeft);
+        
+        // We only show red error if the user has actually moved it (or we are checking state)
+        if (isMisplaced) {
+            card.classList.add('error');
+        }
+    }
+
+    // --- Interaction Logic ---
+
+    onPointerDown(e, num) {
+        e.preventDefault(); // prevent touch scrolling
+        this.isDragging = true;
+        this.draggedItem = num;
+        
+        const card = this.domElements[num];
+        card.classList.add('dragging');
+        
+        // Calculate offset so card doesn't jump to center of mouse
+        const rect = card.getBoundingClientRect();
+        this.dragOffset = e.clientX - rect.left;
+        
+        // Bring to front
+        card.style.zIndex = 100;
+    }
+
+    onPointerMove(e) {
+        if (!this.isDragging) return;
+        e.preventDefault();
+
+        const card = this.domElements[this.draggedItem];
+        
+        // 1. Move the visual card with the mouse
+        const boardRect = this.board.getBoundingClientRect();
+        let relativeX = e.clientX - boardRect.left - this.dragOffset;
+        
+        // Constraint to board bounds (optional, but feels nicer)
+        // relativeX = Math.max(0, Math.min(relativeX, boardRect.width - this.cardWidth));
+
+        // Apply visual transform immediately (no transition)
+        card.style.transform = `translate3d(${relativeX}px, -10px, 0) scale(1.1)`; // Lift up slightly
+
+        // 2. Calculate which "slot" we are hovering over
+        // Center of the dragged card
+        const centerX = relativeX + (this.cardWidth / 2);
+        
+        // Convert pixel X to Index (0..6)
+        // index = (X - padding) / (width + gap)
+        let hoverIndex = Math.floor((centerX - this.boardPadding + (this.gap/2)) / (this.cardWidth + this.gap));
+        
+        // Clamp index
+        hoverIndex = Math.max(0, Math.min(hoverIndex, this.totalN - 1));
+
+        // 3. If index changed, Swap Data and Re-render others
+        const currentIndex = this.items.indexOf(this.draggedItem);
+        
+        if (hoverIndex !== currentIndex) {
+            // Remove from current
+            this.items.splice(currentIndex, 1);
+            // Insert at new
+            this.items.splice(hoverIndex, 0, this.draggedItem);
+
+            // Animate EVERYONE ELSE to their new slots
+            this.items.forEach((num, idx) => {
+                if (num === this.draggedItem) return; // Skip dragged item (mouse controls it)
+                
+                const el = this.domElements[num];
+                const targetX = this.calculateX(idx);
+                el.style.transform = `translate3d(${targetX}px, 0, 0)`;
+                
+                // Update styling based on new zones
+                this.updateCardVisuals(el, idx, num);
+            });
+        }
+    }
+
+    onPointerUp(e) {
+        if (!this.isDragging) return;
+
+        const num = this.draggedItem;
+        const card = this.domElements[num];
+        const finalIndex = this.items.indexOf(num);
+        
+        // Snap dragged card to its final calculated slot
+        const targetX = this.calculateX(finalIndex);
+        
+        card.classList.remove('dragging');
+        card.style.transform = `translate3d(${targetX}px, 0, 0)`;
+        card.style.zIndex = '';
+        
+        // Update visuals one last time (to remove/add error states)
+        this.updateCardVisuals(card, finalIndex, num);
+
+        // Check Win
+        this.checkWinCondition(true);
+
+        this.isDragging = false;
+        this.draggedItem = null;
+    }
+
+    // --- Game Logic ---
+
+    hasSameElements(arr1, arr2) {
+        const set1 = new Set(arr1);
+        return arr1.length === arr2.length && arr2.every(item => set1.has(item));
+    }
+
+    isSameOrder(arr1, arr2) {
+        return JSON.stringify(arr1) === JSON.stringify(arr2);
+    }
+
+    checkWinCondition(showFeedback = true) {
+        const currentLeft = this.items.slice(0, this.selectR);
+        const currentRight = this.items.slice(this.selectR);
+
+        // 1. Check Group Integrity
+        const isIntegrityIntact = this.hasSameElements(currentLeft, this.initialLeft);
+
+        if (!isIntegrityIntact) {
+            if(showFeedback) {
+                this.feedbackEl.innerHTML = `
+                    <div class="msg-error">
+                        <span>⚠ You broke the combination! Move the original numbers back to the left (Blue) side.</span>
+                    </div>
+                `;
+            } else {
+                this.feedbackEl.innerHTML = '';
+            }
+            return;
+        }
+
+        // 2. Check Shuffling
+        const leftShuffled = !this.isSameOrder(currentLeft, this.initialLeft);
+        const rightShuffled = !this.isSameOrder(currentRight, this.initialRight);
+
+        if (leftShuffled && rightShuffled) {
+            this.feedbackEl.innerHTML = `
+                <div class="msg-success">
+                    <span>★ Perfect! You found one of the <strong>r! (n-r)!</strong> permutations!</span>
+                </div>
+            `;
+            // Trigger a little celebration animation on the board?
+            // Optional, but nice.
+        } else {
+            if (showFeedback) {
+                this.feedbackEl.innerHTML = '<span style="color:#94a3b8">Keep shuffling within each group...</span>';
+            }
+        }
+    }
+}
+
+// Initialize
+const game = new PermutationGame();
+
+</script>
+</body>
+</html>

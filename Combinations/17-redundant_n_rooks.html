@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequential Rooks (N! x N!)</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --board-border: #333;
+            --cell-white: #eeeed2;
+            --cell-black: #769656;
+            --cell-disabled: #bdc3c7; /* Grey for deactivated cells */
+            
+            /* Unique Colors for each turn/rook to emphasize order */
+            --rook-1-color: #e74c3c; /* Red */
+            --rook-2-color: #3498db; /* Blue */
+            --rook-3-color: #f1c40f; /* Yellow */
+            --rook-4-color: #9b59b6; /* Purple */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { margin-bottom: 5px; color: #333; }
+        .subtitle { color: #666; font-size: 0.9rem; margin-bottom: 20px; max-width: 400px; text-align: center; }
+
+        /* Game Container */
+        .game-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        /* The Board */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(4, 80px);
+            grid-template-rows: repeat(4, 80px);
+            border: 5px solid var(--board-border);
+            user-select: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        /* Board Cells */
+        .cell {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 50px;
+            cursor: pointer;
+            position: relative;
+            transition: background-color 0.3s ease;
+        }
+
+        .cell.white { background-color: var(--cell-white); }
+        .cell.black { background-color: var(--cell-black); }
+
+        .cell:hover:not(.disabled):not(.occupied) {
+            filter: brightness(1.1);
+        }
+
+        /* Deactivated State */
+        .cell.disabled {
+            background-color: var(--cell-disabled) !important;
+            cursor: not-allowed;
+            /* Optional: Crosshatch pattern to emphasize 'removed' */
+            background-image: linear-gradient(45deg, #000000 5%, transparent 5%, transparent 50%, #000000 50%, #000000 55%, transparent 55%, transparent);
+            background-size: 10px 10px;
+            opacity: 0.6;
+        }
+
+        /* Rook Styling */
+        .rook {
+            font-size: 50px;
+            position: relative;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2;
+        }
+
+        /* Colored Rooks based on turn */
+        .rook-1 { color: var(--rook-1-color); text-shadow: 2px 2px 0px rgba(0,0,0,0.2); }
+        .rook-2 { color: var(--rook-2-color); text-shadow: 2px 2px 0px rgba(0,0,0,0.2); }
+        .rook-3 { color: var(--rook-3-color); text-shadow: 2px 2px 0px rgba(0,0,0,0.2); }
+        .rook-4 { color: var(--rook-4-color); text-shadow: 2px 2px 0px rgba(0,0,0,0.2); }
+
+        /* The little number badge next to the Rook */
+        .order-badge {
+            position: absolute;
+            top: 5px;
+            right: 0px;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            background-color: #333;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+        }
+
+        /* Calculation Display */
+        .math-container {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.5rem;
+            background: #fff;
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 2px solid #ccc;
+            margin-top: 10px;
+            min-width: 300px;
+            text-align: center;
+        }
+
+        .math-term {
+            display: inline-block;
+            transition: all 0.5s;
+        }
+        .math-term.new {
+            color: #d35400;
+            font-weight: bold;
+            transform: scale(1.2);
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+
+        #final-message {
+            margin-top: 15px;
+            font-weight: bold;
+            color: #27ae60;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Sequential 4-Rooks</h1>
+    <p class="subtitle">Click any active cell to place the next Rook. Watch the available options shrink.</p>
+
+    <div class="game-container">
+        <div class="board" id="board">
+            </div>
+    </div>
+
+    <div class="math-container" id="mathDisplay">
+        Available Options: <span id="math-sequence" style="font-weight: bold;">16</span>
+    </div>
+
+    <div id="final-message">
+        Process Complete! Total ways = (4!)² = 576.
+    </div>
+
+    <button onclick="initGame()" style="margin-top:20px; padding: 10px 20px; cursor:pointer; font-size:1rem;">Reset Board</button>
+
+    <script>
+        const boardEl = document.getElementById('board');
+        const mathSeqEl = document.getElementById('math-sequence');
+        const finalMsgEl = document.getElementById('final-message');
+        const n = 4;
+        
+        let turn = 0; // 0 to 3
+        let occupiedRows = new Set();
+        let occupiedCols = new Set();
+        let mathTerms = [];
+
+        function initGame() {
+            boardEl.innerHTML = '';
+            mathSeqEl.innerHTML = '16'; // Initial state: 4x4 options
+            finalMsgEl.style.display = 'none';
+            
+            turn = 0;
+            occupiedRows = new Set();
+            occupiedCols = new Set();
+            mathTerms = ['16'];
+
+            // Generate Grid
+            for (let r = 0; r < n; r++) {
+                for (let c = 0; c < n; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.classList.add((r + c) % 2 === 0 ? 'white' : 'black');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    
+                    cell.addEventListener('click', () => handleCellClick(r, c));
+                    
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function handleCellClick(r, c) {
+            // Logic: Is this move valid?
+            if (occupiedRows.has(r) || occupiedCols.has(c)) {
+                return; // Clicked on a disabled cell
+            }
+            if (turn >= n) return; // Game over
+
+            // 1. Place the Rook
+            const cell = getCell(r, c);
+            const rook = document.createElement('div');
+            rook.classList.add('rook', `rook-${turn + 1}`); // color class
+            rook.innerHTML = `♜<div class="order-badge">${turn + 1}</div>`; // Number badge
+            cell.appendChild(rook);
+            cell.classList.add('occupied');
+
+            // 2. Update State
+            occupiedRows.add(r);
+            occupiedCols.add(c);
+            turn++;
+
+            // 3. Update Visuals (Disable rows and cols)
+            updateBoardVisuals();
+
+            // 4. Update Math Display
+            updateMathDisplay();
+
+            // 5. Check Completion
+            if (turn === n) {
+                finalMsgEl.style.display = 'block';
+            }
+        }
+
+        function getCell(r, c) {
+            // Helper to find the specific DOM element
+            // Grid layout order corresponds to DOM order: index = r * 4 + c
+            return boardEl.children[r * n + c];
+        }
+
+        function updateBoardVisuals() {
+            const cells = Array.from(boardEl.children);
+            cells.forEach(cell => {
+                const r = parseInt(cell.dataset.row);
+                const c = parseInt(cell.dataset.col);
+
+                // If row or col is occupied, disable it (unless it contains a rook)
+                if ((occupiedRows.has(r) || occupiedCols.has(c)) && !cell.children.length) {
+                    cell.classList.add('disabled');
+                }
+            });
+        }
+
+        function updateMathDisplay() {
+            if (turn >= n) return; // No more options to calculate after last move
+
+            // Calculate options remaining for the NEXT turn
+            // Remaining rows = n - turn
+            // Remaining cols = n - turn
+            // Options = (n-turn)^2
+            const remaining = n - turn; 
+            const options = remaining * remaining;
+
+            mathTerms.push(options);
+            
+            // Render: 16 x 9 x ...
+            // We wrap the new term in a span to animate it
+            const html = mathTerms.map((term, index) => {
+                const isLast = index === mathTerms.length - 1;
+                return `<span class="math-term ${isLast ? 'new' : ''}">${term}</span>`;
+            }).join(' × ');
+
+            mathSeqEl.innerHTML = html;
+        }
+
+        // Start
+        initGame();
+
+    </script>
+</body>
+</html>

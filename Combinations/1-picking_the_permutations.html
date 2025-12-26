@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Interactive P(4,3) to C(4,3) Game</title>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --leaf-bg: #dbeafe;
+      --leaf-border: #3b82f6;
+      --box-border: #0891b2;
+      --box-bg: #ecfeff;
+      --box-hover: #cffafe;
+      --success: #22c55e;
+      --error: #ef4444;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f8fafc;
+      margin: 0;
+      padding: 20px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none; /* Prevent text selection while dragging */
+    }
+
+    header {
+      text-align: center;
+      flex-shrink: 0;
+      margin-bottom: 10px;
+    }
+
+    h1 { margin: 0 0 5px 0; font-size: 1.4rem; color: #1e293b; }
+    
+    .status-bar {
+      background: #e2e8f0;
+      border-radius: 99px;
+      display: inline-block;
+      padding: 4px 16px;
+      font-weight: 600;
+      color: #475569;
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+    .status-bar.complete {
+      background: var(--success);
+      color: white;
+      animation: pulse 1s infinite;
+    }
+
+    .controls { margin-top: 10px; }
+    button {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: none;
+      background: var(--primary);
+      color: white;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    button:disabled { background: #cbd5e1; cursor: default; }
+
+    /* Layout */
+    .workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: hidden;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+      padding: 10px;
+      position: relative;
+    }
+
+    /* Tree Section */
+    .tree-container {
+      flex: 3; /* Allocate more space to tree */
+      overflow: auto;
+      position: relative;
+      border-bottom: 2px solid #e2e8f0;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+      /* Gradient to indicate scroll */
+      background: radial-gradient(circle at top, #ffffff, #f1f5f9);
+    }
+
+    svg#edges {
+      position: absolute;
+      top: 0; left: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Recursive Tree Nodes */
+    .branch {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0 6px; 
+      z-index: 1;
+    }
+
+    .node {
+      background: #f8fafc;
+      border: 2px solid #cbd5e1;
+      border-radius: 16px;
+      padding: 5px 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 35px;
+      white-space: nowrap;
+      position: relative;
+      color: #334155;
+    }
+
+    .children-wrapper {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    /* Draggable Leaves */
+    .node.leaf {
+      background: var(--leaf-bg);
+      border-color: var(--leaf-border);
+      color: #1e3a8a;
+      cursor: grab;
+      transition: opacity 0.3s, transform 0.2s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .node.leaf:hover { transform: translateY(-2px); }
+    .node.leaf:active { cursor: grabbing; }
+    
+    .node.leaf.dragged-source { opacity: 0.3; }
+    .node.leaf.harvested {
+      visibility: hidden; /* Hide specifically, don't remove to keep layout */
+      pointer-events: none;
+    }
+
+    /* Boxes Section */
+    .box-container {
+      flex: 2;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      overflow-y: auto;
+      padding: 10px;
+      background: #f8fafc;
+    }
+
+    .box {
+      border: 2px dashed var(--box-border);
+      background: var(--box-bg);
+      border-radius: 10px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: all 0.2s;
+      min-height: 100px;
+    }
+
+    .box-header {
+      font-weight: 800;
+      color: #0e7490;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      pointer-events: none;
+    }
+
+    /* Drop Target States */
+    .box.highlight-valid {
+      background: #ccfbf1;
+      border-color: #0d9488;
+      transform: scale(1.02);
+      border-style: solid;
+    }
+    
+    .box.highlight-error {
+      background: #fee2e2;
+      border-color: #ef4444;
+    }
+
+    .box-content {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 4px;
+      width: 100%;
+      pointer-events: none; /* Let clicks pass through to box */
+    }
+
+    .item-in-box {
+      background: var(--primary);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+    /* The Draggable Ghost */
+    .drag-ghost {
+      position: fixed;
+      z-index: 9999;
+      background: var(--primary);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-weight: bold;
+      pointer-events: none; /* Crucial for finding element below */
+      transform: translate(-50%, -50%) rotate(5deg);
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+      font-size: 0.9rem;
+    }
+
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Build P(4,3) &rarr; Drag to C(4,3)</h1>
+  <div class="status-bar" id="status">Waiting to build...</div>
+  <div class="controls">
+    <button id="btnBuild">Start Game (Build Tree)</button>
+    <button id="btnReset" disabled>Reset</button>
+  </div>
+</header>
+
+<div class="workspace">
+  <div class="tree-container" id="treeContainer">
+    <svg id="edges"></svg>
+    <div id="treeRoot"></div>
+  </div>
+
+  <div class="box-container" id="boxContainer">
+    <div style="color:#94a3b8; text-align:center; grid-column: 1/-1; padding-top:20px;">
+      Boxes will appear here after the tree is built.
+    </div>
+  </div>
+</div>
+
+<script>
+  // -- Configuration --
+  const elements = [1, 2, 3, 4];
+  const r = 3;
+  const totalPermutations = 24; // 4 * 3 * 2
+
+  // -- DOM --
+  const treeRoot = document.getElementById('treeRoot');
+  const treeContainer = document.getElementById('treeContainer');
+  const edgesSvg = document.getElementById('edges');
+  const boxContainer = document.getElementById('boxContainer');
+  const statusEl = document.getElementById('status');
+  const btnBuild = document.getElementById('btnBuild');
+  const btnReset = document.getElementById('btnReset');
+
+  // -- State --
+  let harvestedCount = 0;
+  let isDragging = false;
+  let activeDragData = null; // { key, el, ghost }
+
+  // ------------------------------------------------------------------
+  // 1. Logic & Data Structure
+  // ------------------------------------------------------------------
+
+  function generateTreeData(currentPath, depth) {
+    if (depth === r) {
+      // Leaf
+      return {
+        type: 'leaf',
+        label: currentPath.join(', '),
+        values: [...currentPath],
+        sortKey: [...currentPath].sort().join(''), // Identify combination {1,2,3} vs {3,2,1}
+        children: []
+      };
+    }
+    const children = [];
+    for (const el of elements) {
+      if (!currentPath.includes(el)) {
+        children.push(generateTreeData([...currentPath, el], depth + 1));
+      }
+    }
+    return {
+      type: 'node',
+      label: currentPath.length === 0 ? 'Start' : currentPath[currentPath.length - 1],
+      children: children
+    };
+  }
+
+  // ------------------------------------------------------------------
+  // 2. Rendering the Tree
+  // ------------------------------------------------------------------
+
+  function createBranchDOM(nodeData) {
+    const branch = document.createElement('div');
+    branch.className = 'branch';
+
+    const nodeEl = document.createElement('div');
+    nodeEl.className = 'node';
+    nodeEl.textContent = nodeData.label;
+
+    if (nodeData.type === 'leaf') {
+      nodeEl.classList.add('leaf');
+      nodeEl.dataset.key = nodeData.sortKey;
+      nodeEl.dataset.label = nodeData.label;
+      // Attach Interaction
+      nodeEl.addEventListener('pointerdown', handleDragStart);
+    }
+
+    branch.appendChild(nodeEl);
+
+    if (nodeData.children.length > 0) {
+      const childrenWrapper = document.createElement('div');
+      childrenWrapper.className = 'children-wrapper';
+      nodeData.children.forEach(child => {
+        childrenWrapper.appendChild(createBranchDOM(child));
+      });
+      branch.appendChild(childrenWrapper);
+    }
+    return branch;
+  }
+
+  function updateEdges() {
+    edgesSvg.innerHTML = '';
+    const width = treeContainer.scrollWidth;
+    const height = treeContainer.scrollHeight;
+    edgesSvg.setAttribute('width', width);
+    edgesSvg.setAttribute('height', height);
+
+    const containerRect = treeContainer.getBoundingClientRect();
+    const scrollTop = treeContainer.scrollTop;
+    const scrollLeft = treeContainer.scrollLeft;
+
+    function draw(branch) {
+      const node = branch.children[0];
+      const wrapper = branch.children[1];
+      if (!wrapper) return;
+
+      const pRect = node.getBoundingClientRect();
+      const pX = pRect.left - containerRect.left + (pRect.width / 2) + scrollLeft;
+      const pY = pRect.bottom - containerRect.top + scrollTop;
+
+      Array.from(wrapper.children).forEach(childBranch => {
+        const cNode = childBranch.children[0];
+        const cRect = cNode.getBoundingClientRect();
+        const cX = cRect.left - containerRect.left + (cRect.width / 2) + scrollLeft;
+        const cY = cRect.top - containerRect.top + scrollTop;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', pX);
+        line.setAttribute('y1', pY);
+        line.setAttribute('x2', cX);
+        line.setAttribute('y2', cY);
+        line.setAttribute('stroke', '#94a3b8');
+        line.setAttribute('stroke-width', '1.5');
+        edgesSvg.appendChild(line);
+
+        draw(childBranch);
+      });
+    }
+
+    if (treeRoot.children.length) draw(treeRoot.children[0]);
+  }
+
+  // ------------------------------------------------------------------
+  // 3. Rendering Boxes
+  // ------------------------------------------------------------------
+
+  function prepareBoxes() {
+    boxContainer.innerHTML = '';
+    
+    // Calculate Combinations
+    // Helper to get Combinations(4,3)
+    const combinations = [];
+    const helper = (start, path) => {
+      if (path.length === r) {
+        combinations.push(path.join(''));
+        return;
+      }
+      for (let i = start; i < elements.length; i++) {
+        helper(i + 1, [...path, elements[i]]);
+      }
+    };
+    helper(0, []);
+
+    combinations.forEach(key => {
+      const box = document.createElement('div');
+      box.className = 'box';
+      box.dataset.key = key;
+      // Visual label: "123" -> "{1, 2, 3}"
+      const label = key.split('').join(', ');
+      box.innerHTML = `<div class="box-header">{${label}}</div><div class="box-content"></div>`;
+      boxContainer.appendChild(box);
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // 4. Drag and Drop Logic
+  // ------------------------------------------------------------------
+
+  function handleDragStart(e) {
+    if (isDragging) return;
+    
+    const target = e.currentTarget;
+    if (target.classList.contains('harvested')) return;
+
+    isDragging = true;
+    e.preventDefault(); // prevents standard text selection
+
+    const rect = target.getBoundingClientRect();
+    const key = target.dataset.key;
+    const label = target.dataset.label;
+
+    // Create Ghost
+    const ghost = document.createElement('div');
+    ghost.className = 'drag-ghost';
+    ghost.textContent = label;
+    ghost.style.left = e.clientX + 'px';
+    ghost.style.top = e.clientY + 'px';
+    document.body.appendChild(ghost);
+
+    // Dim source
+    target.classList.add('dragged-source');
+
+    activeDragData = {
+      sourceEl: target,
+      ghost: ghost,
+      key: key,
+      label: label
+    };
+
+    // Global Listeners
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+  }
+
+  function handlePointerMove(e) {
+    if (!activeDragData) return;
+    
+    // Move Ghost
+    const g = activeDragData.ghost;
+    g.style.left = e.clientX + 'px';
+    g.style.top = e.clientY + 'px';
+
+    // Highlight Box Detection
+    // We hide the ghost pointer-events in CSS so elementFromPoint sees below it
+    const elBelow = document.elementFromPoint(e.clientX, e.clientY);
+    const box = elBelow ? elBelow.closest('.box') : null;
+
+    // Remove old highlights
+    document.querySelectorAll('.box').forEach(b => {
+      b.classList.remove('highlight-valid', 'highlight-error');
+    });
+
+    if (box) {
+      if (box.dataset.key === activeDragData.key) {
+        box.classList.add('highlight-valid');
+      } else {
+        box.classList.add('highlight-error');
+      }
+    }
+  }
+
+  function handlePointerUp(e) {
+    document.removeEventListener('pointermove', handlePointerMove);
+    document.removeEventListener('pointerup', handlePointerUp);
+    
+    const { sourceEl, ghost, key, label } = activeDragData;
+    const elBelow = document.elementFromPoint(e.clientX, e.clientY);
+    const box = elBelow ? elBelow.closest('.box') : null;
+
+    // Clear highlights
+    document.querySelectorAll('.box').forEach(b => b.classList.remove('highlight-valid', 'highlight-error'));
+
+    let success = false;
+
+    if (box && box.dataset.key === key) {
+      // SUCCESS DROP
+      success = true;
+      
+      // 1. Add item to box
+      const item = document.createElement('div');
+      item.className = 'item-in-box';
+      item.textContent = label;
+      box.querySelector('.box-content').appendChild(item);
+
+      // 2. Mark source as harvested
+      sourceEl.classList.remove('dragged-source');
+      sourceEl.classList.add('harvested');
+
+      // 3. Animate ghost snapping to box item
+      const itemRect = item.getBoundingClientRect();
+      ghost.style.transition = 'all 0.3s ease';
+      ghost.style.left = (itemRect.left + itemRect.width/2) + 'px';
+      ghost.style.top = (itemRect.top + itemRect.height/2) + 'px';
+      ghost.style.transform = 'scale(0.1)';
+      ghost.style.opacity = '0';
+
+      // 4. Update Score
+      harvestedCount++;
+      updateStatus();
+
+      setTimeout(() => ghost.remove(), 300);
+
+    } else {
+      // FAILED DROP or MISSED
+      // Return to tree animation
+      const sourceRect = sourceEl.getBoundingClientRect();
+      ghost.style.transition = 'all 0.3s ease';
+      ghost.style.left = (sourceRect.left + sourceRect.width/2) + 'px';
+      ghost.style.top = (sourceRect.top + sourceRect.height/2) + 'px';
+      
+      sourceEl.classList.remove('dragged-source');
+      
+      setTimeout(() => ghost.remove(), 300);
+    }
+
+    activeDragData = null;
+    isDragging = false;
+  }
+
+  // ------------------------------------------------------------------
+  // 5. Game Control
+  // ------------------------------------------------------------------
+
+  function updateStatus() {
+    if (harvestedCount === totalPermutations) {
+      statusEl.textContent = `All Permutations Harvested! C(4,3) = ${totalPermutations}/6 = 4`;
+      statusEl.classList.add('complete');
+    } else {
+      statusEl.textContent = `Drag Leaves: ${harvestedCount} / ${totalPermutations}`;
+    }
+  }
+
+  btnBuild.onclick = () => {
+    harvestedCount = 0;
+    statusEl.classList.remove('complete');
+    
+    // Clear previous
+    treeRoot.innerHTML = '';
+    
+    // Build Tree
+    const data = generateTreeData([], 0);
+    treeRoot.appendChild(createBranchDOM(data));
+    
+    // Draw Lines
+    setTimeout(updateEdges, 50); // Tick for layout
+
+    // Build Boxes
+    prepareBoxes();
+
+    updateStatus();
+    btnBuild.disabled = true;
+    btnReset.disabled = false;
+  };
+
+  btnReset.onclick = () => {
+    treeRoot.innerHTML = '';
+    edgesSvg.innerHTML = '';
+    boxContainer.innerHTML = '<div style="color:#94a3b8; text-align:center; grid-column: 1/-1; padding-top:20px;">Boxes will appear here after the tree is built.</div>';
+    statusEl.textContent = "Waiting to build...";
+    statusEl.classList.remove('complete');
+    btnBuild.disabled = false;
+    btnReset.disabled = true;
+  };
+
+  window.addEventListener('resize', () => {
+    if (treeRoot.children.length) updateEdges();
+  });
+
+</script>
+</body>
+</html>

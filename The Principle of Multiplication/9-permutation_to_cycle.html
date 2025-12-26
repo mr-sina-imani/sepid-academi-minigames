@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Combinatorics Workshop: Cyclic Permutations</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f4f8;
+            margin: 0;
+            padding: 20px;
+        }
+        h2 { color: #333; }
+        .instructions {
+            color: #555;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+        canvas {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Activity: Linear to Cyclic Mapping</h2>
+    <div class="instructions">
+        Type numbers <strong>1, 2, 3, 4</strong> to fill the permutation. <br>
+        Watch them take their seats! Press <strong>Space</strong> to reset.
+    </div>
+
+    <canvas id="gameCanvas" width="600" height="500"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Configuration ---
+        const CONFIG = {
+            centerX: 300,
+            centerY: 220,
+            tableRadius: 100,
+            chairDist: 140, // Distance from center to chair
+            chairRadius: 25,
+            startChairColor: '#FF6B6B', // Distinct Red/Pink for top chair
+            normalChairColor: '#4ECDC4', // Teal for others
+            inputBoxY: 420,
+            inputBoxWidth: 300,
+            inputBoxHeight: 50,
+            slotMargin: 10, // Margin between slots
+            // Calculate width for 4 slots with 3 margins: (300 - 3*10) / 4 = 67.5
+            slotWidth: (300 - 3 * 10) / 4, 
+            animSpeed: 0.04 // Speed of movement (0.0 to 1.0)
+        };
+
+        // --- State Management ---
+        let permutation = []; // Stores the user input [1, 3, 2, 4] etc.
+        let movingElements = []; // Stores objects currently animating
+        let seatedElements = []; // Stores objects that have finished moving
+        let isAnimating = false;
+
+        // --- Geometry Setup ---
+        // Define 4 chair positions. Index 0 is Top, proceeding Clockwise.
+        const chairs = [];
+        for (let i = 0; i < 4; i++) {
+            // Angle: Top is -PI/2. Clockwise adds (2*PI)/4
+            const angle = -Math.PI / 2 + (i * (Math.PI * 2) / 4);
+            chairs.push({
+                x: CONFIG.centerX + Math.cos(angle) * CONFIG.chairDist,
+                y: CONFIG.centerY + Math.sin(angle) * CONFIG.chairDist,
+                isStart: i === 0 // Mark the first chair
+            });
+        }
+
+        // --- Input Handling ---
+        window.addEventListener('keydown', (e) => {
+            // Reset
+            if (e.code === 'Space') {
+                resetGame();
+                return;
+            }
+
+            // Input Logic (Only accept 1-4, no duplicates, max 4 inputs)
+            const key = parseInt(e.key);
+            if (!isAnimating && permutation.length < 4 && [1, 2, 3, 4].includes(key)) {
+                if (!permutation.includes(key)) {
+                    permutation.push(key);
+                    
+                    // Trigger animation if full
+                    if (permutation.length === 4) {
+                        startAnimation();
+                    }
+                    draw();
+                }
+            }
+        });
+
+        function resetGame() {
+            permutation = [];
+            movingElements = [];
+            seatedElements = [];
+            isAnimating = false;
+            draw();
+        }
+
+        // --- Animation Logic ---
+        function startAnimation() {
+            isAnimating = true;
+            
+            // Create moving objects for each number
+            // They start at the input box coordinates and move to specific chairs
+            permutation.forEach((num, index) => {
+                const startX = getInputNumberX(index);
+                const startY = CONFIG.inputBoxY;
+                
+                // Index 0 of permutation goes to Chair 0 (Start), Index 1 to Chair 1, etc.
+                const targetChair = chairs[index];
+
+                movingElements.push({
+                    val: num,
+                    x: startX,
+                    y: startY,
+                    startX: startX,
+                    startY: startY,
+                    targetX: targetChair.x,
+                    targetY: targetChair.y,
+                    progress: 0,
+                    delay: index * 20 // Stagger the starts slightly for visual flair
+                });
+            });
+
+            requestAnimationFrame(animateLoop);
+        }
+
+        function animateLoop() {
+            let allFinished = true;
+
+            movingElements.forEach(el => {
+                if (el.delay > 0) {
+                    el.delay--;
+                    allFinished = false;
+                    return;
+                }
+
+                if (el.progress < 1) {
+                    el.progress += CONFIG.animSpeed;
+                    if (el.progress > 1) el.progress = 1;
+                    
+                    // Linear Interpolation (Lerp) with Ease-Out effect
+                    const ease = 1 - Math.pow(1 - el.progress, 3); // Cubic ease out
+                    
+                    el.x = el.startX + (el.targetX - el.startX) * ease;
+                    el.y = el.startY + (el.targetY - el.startY) * ease;
+                    allFinished = false;
+                }
+            });
+
+            draw();
+
+            if (!allFinished) {
+                requestAnimationFrame(animateLoop);
+            } else {
+                // Animation complete
+                seatedElements = [...movingElements];
+                movingElements = []; // Clear movers, they are now "seated"
+                isAnimating = false; // Allow reset, though input is full
+                draw();
+            }
+        }
+
+        // --- Helper: Get X position for numbers in the input box ---
+        function getInputNumberX(index) {
+            // Calculate the center x-coordinate of the 'index'-th slot
+            const startX = (canvas.width - CONFIG.inputBoxWidth) / 2;
+            
+            return startX 
+                + index * (CONFIG.slotWidth + CONFIG.slotMargin)
+                + CONFIG.slotWidth / 2;
+        }
+
+        // --- Drawing Functions ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawTable();
+            drawChairs();
+            drawInputArea();
+            
+            // Draw numbers currently animating
+            movingElements.forEach(el => {
+                drawNumberCircle(el.x, el.y, el.val, '#FFF', '#333');
+            });
+
+            // Draw numbers that have finished sitting
+            seatedElements.forEach(el => {
+                drawNumberCircle(el.x, el.y, el.val, '#FFF', '#333');
+            });
+        }
+
+        function drawTable() {
+            // Table Body
+            ctx.beginPath();
+            ctx.arc(CONFIG.centerX, CONFIG.centerY, CONFIG.tableRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#D4A373'; // Wood color
+            ctx.fill();
+            ctx.strokeStyle = '#A97142';
+            ctx.lineWidth = 5;
+            ctx.stroke();
+
+            // Table Center Decor
+            ctx.beginPath();
+            ctx.arc(CONFIG.centerX, CONFIG.centerY, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#A97142';
+            ctx.fill();
+        }
+
+        function drawChairs() {
+            chairs.forEach((chair, i) => {
+                ctx.beginPath();
+                ctx.arc(chair.x, chair.y, CONFIG.chairRadius, 0, Math.PI * 2);
+                
+                // Color logic: Start chair is distinct
+                ctx.fillStyle = chair.isStart ? CONFIG.startChairColor : CONFIG.normalChairColor;
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Label for Start Chair (Optional, helpful for learners)
+                if (chair.isStart) {
+                    ctx.fillStyle = '#333';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText("START", chair.x, chair.y - 35);
+                }
+            });
+        }
+
+        function drawInputArea() {
+            const totalSlotsWidth = CONFIG.inputBoxWidth;
+            const startX = (canvas.width - totalSlotsWidth) / 2;
+            const y = CONFIG.inputBoxY - 25;
+            
+            // Label
+            ctx.fillStyle = '#666';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText("Input 4-Permutation:", canvas.width/2, y - 10);
+
+            // Draw the 4 explicit slots
+            for (let i = 0; i < 4; i++) {
+                const slotX = startX + i * (CONFIG.slotWidth + CONFIG.slotMargin);
+                const slotY = CONFIG.inputBoxY - CONFIG.inputBoxHeight / 2;
+                
+                // Draw the slot rectangle
+                ctx.strokeStyle = '#999';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(slotX, slotY, CONFIG.slotWidth, CONFIG.inputBoxHeight);
+            }
+
+            // Draw Static Numbers (The "Copy" that stays behind)
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 24px Arial';
+            ctx.textBaseline = 'middle';
+            
+            permutation.forEach((num, i) => {
+                const numX = getInputNumberX(i);
+                ctx.fillText(num, numX, CONFIG.inputBoxY);
+            });
+        }
+
+        function drawNumberCircle(x, y, num, bgColor, textColor) {
+            // White circle background for the number so it stands out
+            ctx.beginPath();
+            ctx.arc(x, y, 15, 0, Math.PI * 2);
+            ctx.fillStyle = bgColor;
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // The Number
+            ctx.fillStyle = textColor;
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(num, x, y);
+        }
+
+        // Initial Draw
+        draw();
+
+    </script>
+</body>
+</html>

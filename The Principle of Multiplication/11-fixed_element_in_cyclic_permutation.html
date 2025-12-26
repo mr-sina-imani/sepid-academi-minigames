@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Combinatorics: Fixed Element Cyclic Permutations ((n-1)!) Method</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f4f8;
+            margin: 0;
+            padding: 10px;
+        }
+        h2 { color: #333; margin-bottom: 5px; }
+        .instructions {
+            color: #555;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            text-align: center;
+            max-width: 900px;
+        }
+        canvas {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .status-msg {
+            margin-top: 10px;
+            font-weight: bold;
+            height: 20px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Activity: Fixed Element Method for Cyclic Permutations</h2>
+    <div class="instructions">
+        The number **4 is fixed** at the top chair. Input a permutation of **(1, 2, 3)** to arrange the remaining elements relative to 4. Complete two stages to see that different linear permutations yield different cycles.
+    </div>
+
+    <canvas id="gameCanvas" width="700" height="450"></canvas>
+    <div id="statusMessage" class="status-msg">Input a 3-permutation (using 1, 2, 3) for Stage 1...</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('statusMessage');
+
+        // --- Configuration ---
+        const CONFIG = {
+            // General Layout
+            numStages: 2,
+            tableSpacing: 350, 
+            centerX: 150,      
+            centerY: 180,
+            
+            // Table Elements
+            tableRadius: 80,
+            chairDist: 110,
+            chairRadius: 20,
+            
+            // Colors
+            fixedElementColor: '#e74c3c', // Distinct color for the fixed '4'
+            startChairColor: '#FF6B6B', 
+            normalChairColor: '#4ECDC4', 
+            arrowColor: '#A97142', 
+            
+            // Input Boxes
+            inputBoxY: 360,
+            inputBoxHeight: 40,
+            slotWidth: 40,
+            slotMargin: 10,
+            
+            // Animation
+            animSpeed: 0.08, 
+            
+            // Status Colors
+            colors: {
+                textDefault: '#333',
+                success: '#2ecc71', 
+                error: '#e74c3c',
+                fixed: '#e74c3c'
+            }
+        };
+
+        // --- Game State ---
+        let activeStage = 0; 
+        let gameFinished = false;
+        let stages = [];
+
+        // --- Initialization ---
+        function initGame() {
+            stages = [];
+            for(let i=0; i<CONFIG.numStages; i++) {
+                stages.push({
+                    id: i,
+                    permutation: [],       // Stores the user's 3-permutation (1, 2, 3)
+                    movingElements: [],    // Elements during animation
+                    seatedElements: [],    // Elements after animation
+                    status: 'input',       
+                    offset: i * CONFIG.tableSpacing,
+                    readyForNext: false, // NEW: Flag to signal the stage is ready for transition
+                });
+            }
+            activeStage = 0;
+            gameFinished = false;
+            updateStatusMessage();
+            draw();
+        }
+
+        // --- Utility ---
+
+        function getAngleForChair(chairIndex) {
+            // 4 chairs, starts at top (-PI/2)
+            return -Math.PI / 2 + (chairIndex * (Math.PI * 2) / 4);
+        }
+        
+        function getChairCoords(offsetX) {
+            const coords = [];
+            for (let i = 0; i < 4; i++) {
+                const angle = getAngleForChair(i);
+                coords.push({
+                    x: offsetX + CONFIG.centerX + Math.cos(angle) * CONFIG.chairDist,
+                    y: CONFIG.centerY + Math.sin(angle) * CONFIG.chairDist,
+                    isStart: i === 0 // Chair 0 is the fixed position
+                });
+            }
+            return coords;
+        }
+
+        function getInputNumberX(offsetX, index) {
+            // 3 slots only
+            const totalWidth = 3 * CONFIG.slotWidth + 2 * CONFIG.slotMargin;
+            const startBoxX = offsetX + CONFIG.centerX - (totalWidth / 2);
+            return startBoxX + index * (CONFIG.slotWidth + CONFIG.slotMargin) + CONFIG.slotWidth / 2;
+        }
+
+
+        // --- Input Handling ---
+        window.addEventListener('keydown', (e) => {
+            if (gameFinished) return;
+
+            const currentStage = stages[activeStage];
+
+            // 1. STAGE TRANSITION LOGIC (FIXED)
+            if (currentStage.status === 'complete' && currentStage.readyForNext) {
+                // Allows any non-control key press to move to the next stage
+                if (e.key.length === 1 || e.code === 'Space' || e.code.startsWith('Key')) {
+                    goToNextStage();
+                    return;
+                }
+            }
+
+
+            // 2. INPUT LOGIC
+            if (currentStage.status === 'input') {
+                // Backspace functionality
+                if (e.code === 'Backspace' && currentStage.permutation.length > 0) {
+                    currentStage.permutation.pop();
+                    draw();
+                    return;
+                }
+
+                // Number Input Logic: Only accept 1, 2, 3
+                const key = parseInt(e.key);
+                if ([1, 2, 3].includes(key)) {
+                    if (!currentStage.permutation.includes(key) && currentStage.permutation.length < 3) {
+                        currentStage.permutation.push(key);
+                        
+                        if (currentStage.permutation.length === 3) {
+                            startAnimation(activeStage);
+                        }
+                        draw();
+                    }
+                }
+            }
+        });
+
+        function updateStatusMessage() {
+            if (gameFinished) {
+                statusEl.textContent = "Demonstration Complete: The 6 unique cyclic permutations are simply the (4-1)! = 6 linear permutations of (1, 2, 3) relative to the fixed '4'.";
+                statusEl.style.color = CONFIG.colors.success;
+                return;
+            }
+            
+            const st = stages[activeStage];
+            if (st.status === 'complete') {
+                 statusEl.textContent = `Stage ${activeStage + 1} Complete. Press ANY KEY to activate Stage ${activeStage + 2}.`;
+                 st.readyForNext = true; // Set flag when the message is displayed
+                 statusEl.style.color = CONFIG.colors.success;
+            } else {
+                statusEl.textContent = `Input a 3-permutation (using 1, 2, 3) for Stage ${activeStage + 1}.`;
+                statusEl.style.color = CONFIG.colors.textDefault;
+            }
+        }
+        
+        // --- Animation ---
+        function startAnimation(stageIdx) {
+            const st = stages[stageIdx];
+            st.status = 'animating';
+            st.readyForNext = false; // Reset flag
+
+            const chairCoords = getChairCoords(st.offset);
+
+            // The 3-permutation [p1, p2, p3] is mapped to chairs 1, 2, 3 respectively (clockwise from fixed '4')
+            st.permutation.forEach((num, index) => {
+                const startX = getInputNumberX(st.offset, index);
+                
+                // Target chair is index + 1, since chair 0 is fixed
+                const targetChairIdx = index + 1; 
+                const targetPos = chairCoords[targetChairIdx];
+
+                st.movingElements.push({
+                    val: num,
+                    chairIndex: targetChairIdx, 
+                    x: startX,
+                    y: CONFIG.inputBoxY,
+                    startX: startX,
+                    startY: CONFIG.inputBoxY,
+                    targetX: targetPos.x,
+                    targetY: targetPos.y,
+                    progress: 0,
+                    delay: index * 10
+                });
+            });
+
+            requestAnimationFrame(animateLoop);
+        }
+
+        function animateLoop() {
+            let stillAnimating = false;
+            const st = stages[activeStage];
+            let elementsSeated = 0;
+
+            st.movingElements.forEach(el => {
+                if (el.delay > 0) {
+                    el.delay--;
+                    stillAnimating = true;
+                    return;
+                }
+
+                if (el.progress < 1) {
+                    el.progress += CONFIG.animSpeed;
+                    if (el.progress > 1) el.progress = 1;
+
+                    const ease = 1 - Math.pow(1 - el.progress, 3);
+                    el.x = el.startX + (el.targetX - el.startX) * ease;
+                    el.y = el.startY + (el.targetY - el.startY) * ease;
+                    
+                    if (el.progress < 1) stillAnimating = true;
+                } else {
+                    elementsSeated++;
+                    stillAnimating = false;
+                }
+            });
+
+            draw();
+
+            if (stillAnimating) {
+                requestAnimationFrame(animateLoop);
+            } else {
+                finalizeStage();
+            }
+        }
+        
+        function finalizeStage() {
+            const st = stages[activeStage];
+            st.seatedElements = [...st.movingElements];
+            st.movingElements = [];
+            st.status = 'complete';
+            
+            if (activeStage < CONFIG.numStages - 1) {
+                activeStage++;
+                updateStatusMessage(); // This sets readyForNext = true
+            } else {
+                gameFinished = true;
+                updateStatusMessage();
+            }
+            draw();
+        }
+
+        function goToNextStage() {
+            const currentStage = stages[activeStage];
+            currentStage.readyForNext = false; // Disable transition flag immediately
+            activeStage++;
+            updateStatusMessage(); // Sets the status to 'input' for the new stage
+            draw();
+        }
+
+        // --- Drawing ---
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stages.forEach(st => drawStage(st));
+        }
+
+        function drawStage(st) {
+            const isActive = (st.id === activeStage);
+            const opacity = isActive ? 1.0 : (st.status === 'complete' ? 1.0 : 0.4);
+            
+            ctx.globalAlpha = opacity;
+
+            // Table, Label
+            ctx.beginPath();
+            ctx.arc(st.offset + CONFIG.centerX, CONFIG.centerY, CONFIG.tableRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#D4A373';
+            ctx.fill();
+            ctx.strokeStyle = '#A97142';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            ctx.fillStyle = '#999';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`Stage ${st.id + 1}`, st.offset + CONFIG.centerX, CONFIG.centerY + 5);
+
+            const chairs = getChairCoords(st.offset);
+            
+            // Draw Chairs and Fixed Element '4'
+            chairs.forEach((chair, i) => {
+                ctx.beginPath();
+                ctx.arc(chair.x, chair.y, CONFIG.chairRadius, 0, Math.PI * 2);
+                
+                let chairColor = CONFIG.normalChairColor;
+                if (chair.isStart) {
+                    chairColor = CONFIG.startChairColor; // Use start color for the fixed chair
+                } else if (st.seatedElements.some(e => e.chairIndex === i)) {
+                    chairColor = CONFIG.normalChairColor; 
+                }
+
+                ctx.fillStyle = chairColor;
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Draw the FIXED element '4'
+                if (chair.isStart) {
+                    ctx.fillStyle = CONFIG.colors.fixed; 
+                    ctx.font = 'bold 18px Arial';
+                    ctx.fillText('4', chair.x, chair.y);
+                    
+                    // Add text emphasis that this element is fixed
+                    ctx.font = '10px Arial';
+                    ctx.fillText('(Fixed)', chair.x, chair.y + CONFIG.chairRadius + 8);
+                }
+            });
+
+            // Draw Input Slots (3 slots only)
+            const totalWidth = 3 * CONFIG.slotWidth + 2 * CONFIG.slotMargin;
+            const startBoxX = st.offset + CONFIG.centerX - (totalWidth / 2);
+            
+            for(let i=0; i<3; i++) {
+                const sx = startBoxX + i * (CONFIG.slotWidth + CONFIG.slotMargin);
+                ctx.strokeStyle = isActive ? '#333' : '#ccc';
+                ctx.lineWidth = isActive ? 2 : 1;
+                ctx.strokeRect(sx, CONFIG.inputBoxY - CONFIG.inputBoxHeight/2, CONFIG.slotWidth, CONFIG.inputBoxHeight);
+            }
+
+            // Draw Static Inputs 
+            st.permutation.forEach((num, i) => {
+                const nx = getInputNumberX(st.offset, i);
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(num, nx, CONFIG.inputBoxY);
+            });
+
+            ctx.globalAlpha = 1.0; 
+
+            // Draw Moving/Seated Elements
+            [...st.movingElements, ...st.seatedElements].forEach(el => {
+                ctx.beginPath();
+                ctx.arc(el.x, el.y, 14, 0, Math.PI*2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(el.val, el.x, el.y);
+            });
+            
+            // Draw Final Cyclic Permutation Result below the input boxes
+            if (st.status === 'complete' || st.status === 'animating') {
+                // Collect seated elements, sort by chair index (1, 2, 3)
+                const seatedValues = st.seatedElements.map(e => ({ val: e.val, index: e.chairIndex }))
+                                                     .sort((a,b) => a.index - b.index)
+                                                     .map(e => e.val);
+                                                     
+                const finalPermutation = ['4', ...seatedValues];
+                
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 18px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`Resulting Cycle: (${finalPermutation.join(', ')})`, st.offset + CONFIG.centerX, CONFIG.inputBoxY + 60);
+            }
+        }
+
+        // Start
+        initGame();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stars and Separators Minigame</title>
+  <style>
+    @font-face{
+      font-family: "Latin Modern Math";
+      src: local("Latin Modern Math"), local("LM Math");
+      font-display: swap;
+    }
+    @font-face{
+      font-family: "STIX Two Text";
+      src: local("STIX Two Text");
+      font-display: swap;
+    }
+
+    :root{
+      --silver-1:#f3f4f6;
+      --silver-2:#e5e7eb;
+      --silver-3:#d1d5db;
+      --bad-bg:#fee2e2;
+      --ok-bg:#dcfce7;
+      font-family: "STIX Two Text", "Latin Modern Math", "Times New Roman", serif;
+    }
+
+    html,body{height:100%;margin:0;background:#ffffff;color:#111827}
+
+    .wrap{max-width:900px;margin:32px auto;padding:16px}
+
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+    .equation-title{font-size:26px}
+
+    button{background:#ffffff;border:1px solid var(--silver-3);padding:6px 12px;border-radius:6px;cursor:pointer;font-family:inherit}
+
+    .board{display:flex;flex-direction:column;gap:24px}
+
+    .top{text-align:center;font-size:24px}
+    .math{font-family:"Latin Modern Math","STIX Two Text",serif}
+    .math sub{font-size:0.65em;vertical-align:-0.2em}
+
+    .bottom{display:flex;gap:24px}
+
+    .column{
+      flex:1;
+      background:linear-gradient(180deg,var(--silver-1),var(--silver-2));
+      border-radius:10px;
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:12px;
+    }
+
+    .col-title{font-variant:small-caps;letter-spacing:0.06em}
+
+    .placeholders{display:flex;flex-direction:column;gap:12px;width:100%;align-items:center}
+
+    .item{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:10px;
+      width:100%;
+      max-width:260px;
+      padding:10px;
+      background:var(--silver-2);
+      border:1px solid var(--silver-3);
+      border-radius:6px;
+      cursor:pointer;
+      opacity:0.4;
+    }
+
+    .item.enabled{opacity:1}
+    .item.bad{background:var(--bad-bg)}
+    .item.ok{background:var(--ok-bg)}
+
+    .label,.value{font-size:18px;text-align:center}
+    .value{min-width:48px}
+    .value.empty{opacity:0.5}
+    .value.active{outline:1.5px dashed #9ca3af;border-radius:4px}
+
+    .string-panel{
+      font-family:"Latin Modern Math","STIX Two Text",serif;
+      font-size:20px;
+      background:#ffffff;
+      border:1px solid var(--silver-3);
+      border-radius:8px;
+      padding:12px;
+      min-height:60px;
+      word-break:break-all;
+      text-align:center;
+    }
+
+    @media (max-width:720px){.bottom{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="equation-title">Stars and separators</div>
+      <button id="resetAll">Reset</button>
+    </header>
+
+    <div class="board">
+      <div class="top">
+        <span class="math">x<sub>1</sub> + x<sub>2</sub> + x<sub>3</sub> + x<sub>4</sub> = 15</span>
+      </div>
+
+      <div class="bottom">
+        <div class="column">
+          <div class="col-title">Solution</div>
+          <div class="placeholders"></div>
+        </div>
+
+        <div class="column">
+          <div class="col-title">String representation</div>
+          <div class="string-panel" id="stringPanel"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const K = 4;
+
+      let activeIndex = 0;
+      let activeValue = null;
+
+      const placeholders = document.querySelector('.placeholders');
+      const stringPanel = document.getElementById('stringPanel');
+
+      const values = Array.from({length: K}, () => '');
+
+      for (let i = 0; i < K; i++){
+        const item = document.createElement('div');
+        item.className = 'item' + (i === 0 ? ' enabled' : '');
+        item.innerHTML = `<div class="label math">x<sub>${i+1}</sub> =</div><div class="value empty math"></div>`;
+        placeholders.appendChild(item);
+
+        const valueEl = item.querySelector('.value');
+
+        item.addEventListener('click', () => {
+          if (i !== activeIndex) return;
+          setActive(valueEl);
+        });
+      }
+
+      function setActive(v){
+        if (activeValue) activeValue.classList.remove('active');
+        activeValue = v;
+        activeValue.classList.add('active');
+      }
+
+      function rebuildString(){
+        let s = '';
+        let sum = 0;
+        let complete = true;
+        for (let i = 0; i < K; i++){
+          const n = parseInt(values[i], 10);
+          const item = placeholders.children[i];
+          item.classList.remove('bad','ok');
+          if (isNaN(n)){
+            complete = false;
+            continue;
+          }
+          sum += n;
+          s += '1'.repeat(n);
+          if (i < K - 1 && i < activeIndex) s += 'S';
+        }
+        // color feedback only when all variables are filled
+        if (complete && activeIndex === K - 1){
+          for (let i = 0; i < K; i++){
+            placeholders.children[i].classList.add(sum === 15 ? 'ok' : 'bad');
+          }
+        }
+        stringPanel.textContent = s;
+      }
+
+      document.addEventListener('keydown', e => {
+        if (!activeValue) return;
+        if (activeIndex < 0 || activeIndex >= K) return;
+
+        if (/^\d$/.test(e.key)){
+          e.preventDefault();
+          activeValue.classList.remove('empty');
+          values[activeIndex] += e.key;
+          activeValue.textContent = values[activeIndex];
+          rebuildString();
+        }
+        else if (e.key === 'Backspace'){
+          e.preventDefault();
+          // Case 1: current variable has digits → delete last digit
+          if (values[activeIndex].length > 0){
+            values[activeIndex] = values[activeIndex].slice(0,-1);
+            activeValue.textContent = values[activeIndex];
+            if (values[activeIndex] === '') activeValue.classList.add('empty');
+            rebuildString();
+          }
+          // Case 2: current variable empty → go back to previous variable
+          else if (activeIndex > 0){
+            activeValue.classList.remove('active');
+            activeIndex--;
+            const prevItem = placeholders.children[activeIndex];
+            activeValue = prevItem.querySelector('.value');
+            activeValue.classList.add('active');
+
+            if (values[activeIndex].length > 0){
+              values[activeIndex] = values[activeIndex].slice(0,-1);
+              activeValue.textContent = values[activeIndex];
+              if (values[activeIndex] === '') activeValue.classList.add('empty');
+            }
+            rebuildString();
+          }
+        }
+        else if (e.key === 'Enter'){
+          if (values[activeIndex] === '') return;
+          activeValue.classList.remove('active');
+          if (activeIndex < K - 1){
+            activeIndex++;
+            const nextItem = placeholders.children[activeIndex];
+            nextItem.classList.add('enabled');
+            activeValue = nextItem.querySelector('.value');
+            activeValue.classList.add('active');
+            rebuildString();
+          }
+        }
+      });
+
+      document.getElementById('resetAll').addEventListener('click', () => {
+        activeIndex = 0;
+        for (let i = 0; i < K; i++){
+          values[i] = '';
+          const item = placeholders.children[i];
+          const v = item.querySelector('.value');
+          v.textContent = '';
+          v.className = 'value empty math';
+          item.className = 'item' + (i === 0 ? ' enabled' : '');
+        }
+        rebuildString();
+        activeValue = placeholders.children[0].querySelector('.value');
+        activeValue.classList.add('active');
+      });
+
+      activeValue = placeholders.children[0].querySelector('.value');
+      activeValue.classList.add('active');
+    });
+  </script>
+</body>
+</html>
+

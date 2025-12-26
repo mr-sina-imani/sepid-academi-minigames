@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Combinatorics: Equivalent Rotations (Fixed Alignment)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f4f8;
+            margin: 0;
+            padding: 10px;
+        }
+        h2 { color: #333; margin-bottom: 5px; }
+        .instructions {
+            color: #555;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            text-align: center;
+            max-width: 900px;
+        }
+        canvas {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .status-msg {
+            margin-top: 10px;
+            font-weight: bold;
+            height: 20px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Activity: Equivalent Rotations (The Puzzle)</h2>
+    <div class="instructions">
+        Watch the cyclic rotation transition. Use the single gray hint and the curved arrows to solve the equivalent permutation. You can use <strong>BACKSPACE</strong> to correct inputs.
+    </div>
+
+    <canvas id="gameCanvas" width="1200" height="450"></canvas>
+    <div id="statusMessage" class="status-msg">Input permutation for Table 1...</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('statusMessage');
+
+        // --- Configuration ---
+        const CONFIG = {
+            numTables: 4,
+            tableSpacing: 300, 
+            centerX: 150,      
+            centerY: 180,
+            tableRadius: 80,
+            chairDist: 110,
+            chairRadius: 20,
+            arrowGap: 15, // Gap between chair and arrow start/end
+            startChairColor: '#FF6B6B', 
+            normalChairColor: '#4ECDC4', 
+            arrowColor: '#A97142', 
+            inputBoxY: 360,
+            inputBoxHeight: 40,
+            slotWidth: 40,
+            slotMargin: 10,
+            animSpeed: 0.05,
+            transitionSpeed: 0.02, 
+            colors: {
+                textDefault: '#333',
+                ghost: '#a0a0a0', 
+                success: '#2ecc71', 
+                error: '#e74c3c',
+                transition: '#8e44ad' 
+            }
+        };
+
+        // --- Game State ---
+        let activeStage = 0; 
+        let gameFinished = false;
+        let stages = [];
+        let transitionElements = []; 
+
+        function initGame() {
+            stages = [];
+            for(let i=0; i<CONFIG.numTables; i++) {
+                stages.push({
+                    id: i,
+                    permutation: [],       
+                    movingElements: [],    
+                    seatedElements: [],    
+                    status: 'input',       
+                    offset: i * CONFIG.tableSpacing,
+                    targetHints: [] 
+                });
+            }
+            activeStage = 0;
+            gameFinished = false;
+            updateStatusMessage();
+            draw();
+        }
+
+        // --- Logic ---
+        function getTargetValueForChair(stageIndex, chairIndex) {
+            if (stageIndex === 0) return null; 
+            if (stages[0].seatedElements.length !== 4) return null; 
+            const sourceChairIndex = (chairIndex - stageIndex + 4) % 4;
+            const sourceEl = stages[0].seatedElements.find(el => el.chairIndex === sourceChairIndex);
+            return sourceEl ? sourceEl.val : null;
+        }
+        
+        function getAngleForChair(chairIndex) {
+            return -Math.PI / 2 + (chairIndex * (Math.PI * 2) / 4);
+        }
+
+        // --- Input Handling ---
+        window.addEventListener('keydown', (e) => {
+            if (gameFinished) return;
+            const currentStage = stages[activeStage];
+
+            if (e.code === 'Backspace' && currentStage.status === 'input' && currentStage.permutation.length > 0) {
+                currentStage.permutation.pop();
+                draw();
+                return;
+            }
+
+            if (e.code === 'Space') {
+                if (currentStage.status === 'failed') {
+                    currentStage.permutation = [];
+                    currentStage.movingElements = [];
+                    currentStage.seatedElements = [];
+                    currentStage.status = 'input';
+                    updateStatusMessage();
+                    draw();
+                } 
+                return;
+            }
+
+            const key = parseInt(e.key);
+            if (currentStage.status === 'input' && [1, 2, 3, 4].includes(key)) {
+                if (!currentStage.permutation.includes(key) && currentStage.permutation.length < 4) {
+                    currentStage.permutation.push(key);
+                    if (currentStage.permutation.length === 4) startAnimation(activeStage);
+                    draw();
+                }
+            }
+        });
+
+        function updateStatusMessage() {
+            if (gameFinished) {
+                statusEl.textContent = "Success! You've successfully mapped all cyclic equivalents.";
+                statusEl.style.color = CONFIG.colors.success;
+                return;
+            }
+            const st = stages[activeStage];
+            if (st.status === 'failed') {
+                statusEl.textContent = `Incorrect permutation for Table ${activeStage + 1}. Press SPACE to retry.`;
+                statusEl.style.color = CONFIG.colors.error;
+            } else if (st.status === 'transitioning') {
+                statusEl.textContent = "Visualizing the cyclic shift to the next stage...";
+                statusEl.style.color = CONFIG.colors.transition;
+            } else if (activeStage === 0) {
+                statusEl.textContent = "Define the initial permutation for the cycle.";
+                statusEl.style.color = CONFIG.colors.textDefault;
+            } else {
+                statusEl.textContent = `Solve Table ${activeStage + 1}. Use the single hint and arrows.`;
+                statusEl.style.color = CONFIG.colors.textDefault;
+            }
+        }
+
+        // --- Animation Loops ---
+        function startAnimation(stageIdx) {
+            const st = stages[stageIdx];
+            st.status = 'animating';
+            const chairCoords = getChairCoords(st.offset);
+
+            st.permutation.forEach((num, index) => {
+                const startX = getInputNumberX(st.offset, index);
+                const targetChairIdx = index;
+                const targetPos = chairCoords[targetChairIdx];
+
+                st.movingElements.push({
+                    val: num,
+                    chairIndex: targetChairIdx, 
+                    x: startX,
+                    y: CONFIG.inputBoxY,
+                    startX: startX,
+                    startY: CONFIG.inputBoxY,
+                    targetX: targetPos.x,
+                    targetY: targetPos.y,
+                    progress: 0,
+                    delay: index * 10,
+                    isCorrect: false
+                });
+            });
+            requestAnimationFrame(animateLoop);
+        }
+
+        function animateLoop() {
+            let stillAnimating = false;
+            const st = stages[activeStage];
+
+            st.movingElements.forEach(el => {
+                if (el.delay > 0) { el.delay--; stillAnimating = true; return; }
+                if (el.progress < 1) {
+                    el.progress += CONFIG.animSpeed;
+                    if (el.progress > 1) el.progress = 1;
+                    const ease = 1 - Math.pow(1 - el.progress, 3);
+                    el.x = el.startX + (el.targetX - el.startX) * ease;
+                    el.y = el.startY + (el.targetY - el.startY) * ease;
+                    
+                    if (el.progress === 1 && !el.checked) {
+                        el.checked = true;
+                        if (activeStage === 0) el.isCorrect = true; 
+                        else {
+                            const expectedVal = getTargetValueForChair(activeStage, el.chairIndex);
+                            el.isCorrect = (el.val === expectedVal);
+                        }
+                    }
+                    if (el.progress < 1) stillAnimating = true;
+                }
+            });
+            draw();
+            if (stillAnimating) requestAnimationFrame(animateLoop);
+            else finalizeStage();
+        }
+        
+        function finalizeStage() {
+            const st = stages[activeStage];
+            st.seatedElements = [...st.movingElements];
+            st.movingElements = [];
+            const hasError = st.seatedElements.some(el => !el.isCorrect);
+
+            if (hasError) {
+                st.status = 'failed';
+                updateStatusMessage();
+                draw();
+            } else {
+                st.status = 'complete';
+                if (activeStage < CONFIG.numTables - 1) startTransition(activeStage);
+                else {
+                    gameFinished = true;
+                    updateStatusMessage();
+                    draw();
+                }
+            }
+        }
+        
+        function startTransition(sourceStageIdx) {
+            const sourceStage = stages[sourceStageIdx];
+            const targetStageIdx = sourceStageIdx + 1;
+            const targetStage = stages[targetStageIdx];
+            targetStage.status = 'transitioning';
+            updateStatusMessage();
+
+            const sourceChairs = getChairCoords(sourceStage.offset);
+            const targetChairs = getChairCoords(targetStage.offset);
+            
+            transitionElements = sourceStage.seatedElements.map(seatedEl => {
+                const sourceChair = sourceChairs[seatedEl.chairIndex];
+                const targetChair = targetChairs[seatedEl.chairIndex];
+                return {
+                    val: seatedEl.val,
+                    startChairIdx: seatedEl.chairIndex,
+                    endChairIdx: (seatedEl.chairIndex + 1) % 4, 
+                    x: sourceChair.x,
+                    y: sourceChair.y,
+                    startX: sourceChair.x,
+                    startY: sourceChair.y,
+                    targetX: targetChair.x,
+                    targetY: targetChair.y,
+                    progress: 0,
+                    phase: 1 
+                };
+            });
+            requestAnimationFrame(transitionAnimationLoop);
+        }
+
+        function transitionAnimationLoop() {
+            let stillTransitioning = false;
+            const targetCenterX = stages[activeStage + 1].offset + CONFIG.centerX;
+            const targetCenterY = CONFIG.centerY;
+
+            transitionElements.forEach(el => {
+                if (el.phase === 1) {
+                    el.progress += CONFIG.transitionSpeed * 2; 
+                    if (el.progress > 1) el.progress = 1;
+                    el.x = el.startX + (el.targetX - el.startX) * el.progress;
+                    el.y = el.startY + (el.targetY - el.startY) * el.progress;
+ stillTransitioning = true;
+
+                    if (el.progress === 1) {
+                        el.phase = 2;
+                        el.progress = 0;
+                        el.startAngle = getAngleForChair(el.startChairIdx);
+                        el.endAngle = getAngleForChair(el.endChairIdx);
+                        if (el.endAngle < el.startAngle) el.endAngle += Math.PI * 2; 
+                    }
+                } else if (el.phase === 2) {
+                    el.progress += CONFIG.transitionSpeed;
+                    if (el.progress > 1) el.progress = 1;
+                    const currentAngle = el.startAngle + (el.endAngle - el.startAngle) * el.progress;
+                    el.x = targetCenterX + Math.cos(currentAngle) * CONFIG.chairDist;
+                    el.y = targetCenterY + Math.sin(currentAngle) * CONFIG.chairDist;
+                    if (el.progress < 1) stillTransitioning = true;
+                }
+            });
+            draw();
+            if (stillTransitioning) requestAnimationFrame(transitionAnimationLoop);
+            else finalizeTransition();
+        }
+
+        function finalizeTransition() {
+            const targetStageIdx = activeStage + 1;
+            const targetStage = stages[targetStageIdx];
+            const hintVal = getTargetValueForChair(targetStageIdx, 0); 
+            if (hintVal !== null) targetStage.targetHints = [{ val: hintVal, chairIndex: 0 }];
+            else targetStage.targetHints = [];
+
+            activeStage++;
+            targetStage.status = 'input';
+            transitionElements = [];
+            updateStatusMessage();
+            draw();
+        }
+
+        // --- Drawing ---
+        function getChairCoords(offsetX) {
+            const coords = [];
+            for (let i = 0; i < 4; i++) {
+                const angle = getAngleForChair(i);
+                coords.push({
+                    x: offsetX + CONFIG.centerX + Math.cos(angle) * CONFIG.chairDist,
+                    y: CONFIG.centerY + Math.sin(angle) * CONFIG.chairDist,
+                    isStart: i === 0
+                });
+            }
+            return coords;
+        }
+
+        function getInputNumberX(offsetX, index) {
+            const totalWidth = 4 * CONFIG.slotWidth + 3 * CONFIG.slotMargin;
+            const startBoxX = offsetX + CONFIG.centerX - (totalWidth / 2);
+            return startBoxX + index * (CONFIG.slotWidth + CONFIG.slotMargin) + CONFIG.slotWidth / 2;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stages.forEach(st => drawStage(st));
+            drawTransitionElements();
+        }
+
+        function drawStage(st) {
+            const isActive = (st.id === activeStage) || st.status === 'transitioning';
+            const isFuture = (st.id > activeStage) && st.status !== 'transitioning';
+            ctx.globalAlpha = isFuture ? 0.3 : 1.0;
+
+            // Table
+            ctx.beginPath();
+            ctx.arc(st.offset + CONFIG.centerX, CONFIG.centerY, CONFIG.tableRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#D4A373';
+            ctx.fill();
+            ctx.strokeStyle = '#A97142';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // Label
+            ctx.fillStyle = '#999';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(st.id === 0 ? "Original" : `Rotation ${st.id}`, st.offset + CONFIG.centerX, CONFIG.centerY + 5);
+
+            // Arrows 
+            drawArrows(st.offset + CONFIG.centerX, CONFIG.centerY, CONFIG.arrowColor);
+
+            // Chairs & Hints
+            const chairs = getChairCoords(st.offset);
+            chairs.forEach((chair, i) => {
+                ctx.beginPath();
+                ctx.arc(chair.x, chair.y, CONFIG.chairRadius, 0, Math.PI * 2);
+                ctx.fillStyle = chair.isStart ? CONFIG.startChairColor : CONFIG.normalChairColor;
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                if (st.id > 0 && st.id === activeStage) { 
+                    const hint = st.targetHints.find(h => h.chairIndex === i);
+                    if (hint) {
+                        const isOccupied = st.seatedElements.some(e => e.chairIndex === i) || 
+                                           st.movingElements.some(e => e.chairIndex === i);
+                        if (!isOccupied) {
+                            ctx.fillStyle = CONFIG.colors.ghost;
+                            ctx.font = 'bold 16px Arial';
+                            ctx.textBaseline = 'middle';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(hint.val, chair.x, chair.y);
+                        }
+                    }
+                }
+            });
+
+            // Input Slots
+            const totalWidth = 4 * CONFIG.slotWidth + 3 * CONFIG.slotMargin;
+            const startBoxX = st.offset + CONFIG.centerX - (totalWidth / 2);
+            for(let i=0; i<4; i++) {
+                const sx = startBoxX + i * (CONFIG.slotWidth + CONFIG.slotMargin);
+                ctx.strokeStyle = isActive ? '#333' : '#ccc';
+                ctx.lineWidth = isActive ? 2 : 1;
+                ctx.strokeRect(sx, CONFIG.inputBoxY - CONFIG.inputBoxHeight/2, CONFIG.slotWidth, CONFIG.inputBoxHeight);
+            }
+
+            // Draw Static Inputs (FIXED ALIGNMENT HERE)
+            st.permutation.forEach((num, i) => {
+                const nx = getInputNumberX(st.offset, i);
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle'; // *** THIS WAS ADDED/ENSURED ***
+                ctx.fillText(num, nx, CONFIG.inputBoxY);
+            });
+
+            ctx.globalAlpha = 1.0; 
+
+            // Elements
+            [...st.movingElements, ...st.seatedElements].forEach(el => {
+                let color = '#fff', stroke = '#333';
+                if (el.checked) {
+                    color = el.isCorrect ? CONFIG.colors.success : CONFIG.colors.error;
+                    stroke = el.isCorrect ? '#27ae60' : '#c0392b';
+                }
+                ctx.beginPath();
+                ctx.arc(el.x, el.y, 14, 0, Math.PI*2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = el.checked ? '#fff' : '#333';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle'; // Ensure consistency for moving elements too
+                ctx.fillText(el.val, el.x, el.y);
+            });
+        }
+        
+        function drawTransitionElements() {
+            transitionElements.forEach(el => {
+                ctx.beginPath();
+                ctx.arc(el.x, el.y, 14, 0, Math.PI*2);
+                ctx.fillStyle = CONFIG.colors.transition;
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(el.val, el.x, el.y);
+            });
+        }
+        
+        function drawArrowhead(ctx, x, y, angle, color, size) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-size, -size/2);
+            ctx.lineTo(-size, size/2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawArrows(cx, cy, color) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            const radius = CONFIG.chairDist;
+            const arrowHeadSize = 8;
+            
+            const gapLength = CONFIG.chairRadius + CONFIG.arrowGap;
+            const angleGap = gapLength / radius;
+
+            for(let i = 0; i < 4; i++) {
+                let startAngle = getAngleForChair(i);
+                let endAngle = getAngleForChair((i + 1) % 4);
+
+                if (endAngle <= startAngle) {
+                    endAngle += Math.PI * 2;
+                }
+
+                const arcStart = startAngle + angleGap;
+                const arcEnd = endAngle - angleGap;
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, arcStart, arcEnd);
+                ctx.stroke();
+
+                const arrowX = cx + Math.cos(arcEnd) * radius;
+                const arrowY = cy + Math.sin(arcEnd) * radius;
+                const rotation = arcEnd + Math.PI / 2;
+
+                drawArrowhead(ctx, arrowX, arrowY, rotation, color, arrowHeadSize);
+            }
+        }
+
+        initGame();
+
+    </script>
+</body>
+</html>

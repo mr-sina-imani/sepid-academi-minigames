@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>7×7 Grid — Diagonal x + y = 6</title>
+  <style>
+    :root{
+      --bg:#f6f8fb; /* light background */
+      --panel:#ffffff;
+      --muted:#5b6b82;
+      --grid:#2f3a4a;
+      --line:#2b7be3; /* main blue */
+      --highlight:#154a9e; /* darker blue for vertices on the line */
+      --accent:#0f1724;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,var(--bg),#eef2f7);color:var(--accent);}
+    .wrap{max-width:900px;margin:28px auto;padding:20px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px;box-shadow:0 6px 30px rgba(2,6,23,0.6);}
+    h1{font-size:18px;margin:0 0 12px 0;color:var(--accent)}
+    p.lead{margin:0 0 18px 0;color:var(--muted);font-size:13px}
+    .board{display:flex;gap:18px;align-items:flex-start}
+    .svg-wrap{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00));padding:12px;border-radius:8px}
+    svg{display:block;background:transparent}
+    .legend{font-size:13px;color:var(--muted);}
+    .legend .sw{display:inline-block;width:14px;height:14px;border-radius:4px;margin-right:8px;vertical-align:middle}
+    .hint{margin-top:12px;color:var(--muted);font-size:13px}
+    .coords{margin-left:12px;color:var(--muted);font-size:13px}
+    .credit{margin-top:10px;color:var(--muted);font-size:12px}
+    /* Tooltip */
+    .tooltip{position:fixed;pointer-events:none;background:#021728;border:1px solid rgba(255,255,255,0.06);padding:6px 8px;border-radius:6px;font-size:12px;color:var(--accent);box-shadow:0 6px 24px rgba(2,6,23,0.6);transform:translate(-50%,-120%);white-space:nowrap}
+    @media (max-width:720px){.wrap{margin:12px;padding:14px}.board{flex-direction:column;align-items:center}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>7×7 grid — diagonal <code>x + y = 6</code></h1>
+    <p class="lead">SVG-based board. Origin is the lower-left corner. The diagonal line connecting (0,6) and (6,0) is drawn in blue; vertices that lie on x+y=6 are highlighted in darker blue and slightly larger.</p>
+
+    <div class="board">
+      <div class="svg-wrap" id="svgContainer"></div>
+      <div class="coords">
+        <div class="legend"><strong>Legend</strong></div>
+        <div class="legend" style="margin-top:8px"><span class="sw" style="background:var(--grid);border:1px solid rgba(255,255,255,0.02)"></span> Grid lines & vertices</div>
+        <div class="legend" style="margin-top:6px"><span class="sw" style="background:var(--line)"></span> Diagonal x + y = 6</div>
+        <div class="legend" style="margin-top:6px"><span class="sw" style="background:var(--highlight)"></span> Vertices where x + y = 6</div>
+        <div class="hint">Hover a vertex to see its (x,y)</div>
+        <div class="credit">Single-file demo · open locally</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tooltip" class="tooltip" style="display:none"></div>
+
+<script>
+(function(){
+  const gridSize = 7; // number of cells per side (7x7 cells). Vertices run 0..7
+  const cell = 56; // pixels per cell
+  const padding = 28; // increased padding to avoid clipping axis labels // padding around svg
+  const vertices = gridSize + 1; // 8
+  const width = cell * gridSize;
+  const height = cell * gridSize;
+
+  // map grid coordinate (x in [0,gridSize]) to SVG x (pixels)
+  const mapX = x => padding + x * cell;
+  // map grid coordinate y to SVG y (flip origin to lower-left)
+  const mapY = y => padding + (height - y * cell);
+
+  // Build SVG
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS,'svg');
+  svg.setAttribute('width', width + padding * 2);
+  svg.setAttribute('height', height + padding * 2 + 18); // extra bottom space for x-axis labels
+  svg.setAttribute('viewBox', `0 0 ${width + padding*2} ${height + padding*2 + 18}`);
+  svg.setAttribute('aria-label','7 by 7 grid with diagonal x + y = 6');
+
+  // background rect for contrast
+  const bg = document.createElementNS(svgNS,'rect');
+  bg.setAttribute('x',0);
+  bg.setAttribute('y',0);
+  bg.setAttribute('width',width + padding*2);
+  bg.setAttribute('height',height + padding*2);
+  bg.setAttribute('fill','transparent');
+  svg.appendChild(bg);
+
+  // grid lines
+  for(let i=0;i<=gridSize;i++){
+    // vertical
+    const vx = document.createElementNS(svgNS,'line');
+    vx.setAttribute('x1', mapX(i)); vx.setAttribute('y1', mapY(0));
+    vx.setAttribute('x2', mapX(i)); vx.setAttribute('y2', mapY(gridSize));
+    vx.setAttribute('stroke','var(--grid)');
+    vx.setAttribute('stroke-opacity', '0.18');
+    vx.setAttribute('stroke-width','1');
+    svg.appendChild(vx);
+    // horizontal
+    const hy = document.createElementNS(svgNS,'line');
+    hy.setAttribute('x1', mapX(0)); hy.setAttribute('y1', mapY(i));
+    hy.setAttribute('x2', mapX(gridSize)); hy.setAttribute('y2', mapY(i));
+    hy.setAttribute('stroke','var(--grid)');
+    hy.setAttribute('stroke-opacity', '0.18');
+    hy.setAttribute('stroke-width','1');
+    svg.appendChild(hy);
+  }
+
+  // Draw diagonal line x+y=6 as a single straight segment from (0,6) to (6,0)
+  const diag = document.createElementNS(svgNS,'line');
+  const xA=0, yA=6, xB=6, yB=0; // endpoints
+  diag.setAttribute('x1', mapX(xA)); diag.setAttribute('y1', mapY(yA));
+  diag.setAttribute('x2', mapX(xB)); diag.setAttribute('y2', mapY(yB));
+  diag.setAttribute('stroke','var(--line)');
+  diag.setAttribute('stroke-width','4');
+  diag.setAttribute('stroke-linecap','round');
+  diag.setAttribute('opacity','0.95');
+  svg.appendChild(diag);
+
+  // vertices (points at integer grid coordinates 0..gridSize)
+  const verticesGroup = document.createElementNS(svgNS,'g');
+  for(let x=0;x<=gridSize;x++){
+    for(let y=0;y<=gridSize;y++){
+      const cx = mapX(x);
+      const cy = mapY(y);
+      const onLine = (x + y) === 6; // highlight condition
+      const r = onLine ? 6 : 3;
+      const circle = document.createElementNS(svgNS,'circle');
+      circle.setAttribute('cx', cx);
+      circle.setAttribute('cy', cy);
+      circle.setAttribute('r', r);
+      circle.setAttribute('fill', onLine ? 'var(--highlight)' : 'var(--grid)');
+      circle.setAttribute('stroke', 'rgba(0,0,0,0.12)');
+      circle.setAttribute('stroke-width','0.6');
+      circle.dataset.coord = `${x},${y}`;
+      circle.dataset.online = onLine ? '1' : '0';
+      // pointer area slightly bigger for easier hover on small circles
+      circle.style.cursor = 'default';
+      verticesGroup.appendChild(circle);
+
+      // add hover interactivity
+      circle.addEventListener('mouseenter',(e)=>{
+        const t = document.getElementById('tooltip');
+        t.style.display = 'block';
+        const [cxStr,cyStr] = circle.dataset.coord.split(',');
+        t.textContent = `(${cxStr}, ${cyStr})` + (circle.dataset.online==='1' ? ' — on x+y=6' : '');
+      });
+      circle.addEventListener('mouseleave',(e)=>{
+        const t = document.getElementById('tooltip');
+        t.style.display = 'none';
+      });
+      circle.addEventListener('mousemove',(e)=>{
+        const t = document.getElementById('tooltip');
+        t.style.left = (e.clientX + 12) + 'px';
+        t.style.top = (e.clientY - 12) + 'px';
+      });
+    }
+  }
+  svg.appendChild(verticesGroup);
+
+  // axis labels: numbers 0..gridSize along bottom (x) and left (y)
+  const labels = document.createElementNS(svgNS,'g');
+  for(let i=0;i<=gridSize;i++){
+    // x label
+    const lx = document.createElementNS(svgNS,'text');
+    lx.setAttribute('x', mapX(i));
+    lx.setAttribute('y', mapY(0) + 26); // move x-axis labels further down
+    lx.setAttribute('text-anchor','middle');
+    lx.setAttribute('font-size','11');
+    lx.setAttribute('fill','var(--muted)');
+    lx.textContent = i;
+    labels.appendChild(lx);
+    // y label (left side)
+    const ly = document.createElementNS(svgNS,'text');
+    ly.setAttribute('x', mapX(0) - 14);
+    ly.setAttribute('y', mapY(i) + 4);
+    ly.setAttribute('text-anchor','end');
+    ly.setAttribute('font-size','11');
+    ly.setAttribute('fill','var(--muted)');
+    ly.textContent = i;
+    labels.appendChild(ly);
+  }
+  svg.appendChild(labels);
+
+  // attach svg
+  const container = document.getElementById('svgContainer');
+  container.appendChild(svg);
+
+  // small accessibility note: keyboard focus on SVG will outline it
+  svg.setAttribute('tabindex','0');
+
+  // Add CSS variables into svg via style element so SVG can reference them.
+  // (some browsers don't resolve CSS custom properties across HTML->SVG reliably, so embed a small inline style here too)
+  const svgStyle = document.createElementNS(svgNS,'style');
+  svgStyle.textContent = `
+    circle { transition: none; }
+    circle:hover { }
+    line { shape-rendering:geometricPrecision; }
+    text { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+  `;
+  svg.prepend(svgStyle);
+
+})();
+</script>
+</body>
+</html>
+

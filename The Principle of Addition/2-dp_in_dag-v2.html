@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAG Path Counting (Denser Asymmetrical Graph)</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --text-main: #1e293b;
+            --edge-line: #94a3b8;
+            --vertex-initial: #cbd5e1;
+            --vertex-editable: #fff;
+            --input-border: #64748b;
+            --success: #10b981;
+            --error: #ef4444;
+            --info: #2563eb;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h1 { margin-bottom: 0.5rem; }
+        p { color: #64748b; margin-bottom: 2rem; text-align: center; max-width: 800px; }
+
+        #game-container {
+            position: relative;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            width: 600px; /* Increased width to accommodate dense graph */
+            min-height: 750px; /* Increased height for more layers */
+        }
+        
+        /* --- SVG Edge Styling --- */
+        #graph-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10; 
+        }
+
+        .dag-edge {
+            stroke: var(--edge-line);
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+        
+        /* --- Vertex Input Styling --- */
+        .vertex-group {
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 40px; 
+            height: 40px;
+            transform: translate(-50%, -50%);
+            z-index: 20; 
+        }
+
+        .vertex-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: var(--vertex-editable);
+            border: 2px solid var(--input-border);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: all 0.3s;
+        }
+
+        .vertex-circle.initial {
+            background-color: var(--vertex-initial);
+            border-color: var(--edge-line);
+            color: var(--text-main);
+            pointer-events: none;
+            cursor: default;
+        }
+
+        .vertex-circle.correct {
+            background-color: var(--success);
+            border-color: var(--success);
+            color: white;
+        }
+
+        .vertex-circle.incorrect {
+            background-color: var(--error);
+            border-color: var(--error);
+            color: white;
+            animation: shake 0.5s;
+        }
+        
+        .vertex-circle input {
+            width: 90%;
+            height: 90%;
+            border: none;
+            text-align: center;
+            font-size: 1rem;
+            font-weight: bold;
+            background: transparent;
+            /* FIX: Ensure number is perfectly centered */
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .vertex-circle.correct input { color: white; }
+        .vertex-circle.incorrect input { color: white; }
+        
+        .label-A, .label-B {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--info);
+            pointer-events: none;
+        }
+        .label-A { top: -20px; }
+        .label-B { bottom: -20px; }
+
+
+        /* --- Status Bar --- */
+        #status-bar {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            height: 40px;
+            border-radius: 6px;
+            color: var(--text-main);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(-50%, -50%); }
+            20%, 60% { transform: translate(-55%, -50%); }
+            40%, 80% { transform: translate(-45%, -50%); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Generalizing the Sum Principle to Directed Graphs</h1>
+    <p>
+        The number of simple paths to any vertex is the sum of the path counts of all connected vertices in the **previous** row (which are disjoint paths). <br>
+        Find the total number of paths from the start (A) to the end (B).
+    </p>
+
+    <div id="game-container">
+        <svg id="graph-svg">
+            <defs>
+                <marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--edge-line)" />
+                </marker>
+            </defs>
+        </svg>
+        
+        </div>
+
+    <div id="status-bar">Work layer by layer, starting from the top.</div>
+
+    <script>
+        // --- Configuration ---
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        const TOTAL_LAYERS = 6; // Layers 0 to 5
+        const V_SPACING = 120; // Vertical spacing between layers
+        const H_WIDTH = 560; // Total horizontal space for vertices (Increased for wider layout)
+
+        // Graph Definition (DENSE and ASYMMETRICAL)
+        const layerLayout = [
+            { count: 1, yOffset: 50, hCenters: [0.5] }, // L0 (0)
+            { count: 4, yOffset: 150, hCenters: [0.15, 0.4, 0.6, 0.85] }, // L1 (1, 2, 3, 4)
+            { count: 3, yOffset: 250, hCenters: [0.3, 0.5, 0.7] }, // L2 (5, 6, 7)
+            { count: 4, yOffset: 350, hCenters: [0.1, 0.35, 0.6, 0.9] }, // L3 (8, 9, 10, 11)
+            { count: 2, yOffset: 450, hCenters: [0.3, 0.7] }, // L4 (12, 13)
+            { count: 1, yOffset: 550, hCenters: [0.5] } // L5 (14)
+        ];
+        
+        // Vertices IDs: L0(0), L1(1-4), L2(5-7), L3(8-11), L4(12-13), L5(14)
+        const allEdges = [
+            // L0 -> L1 (0 -> 1, 2, 3)
+            [0, 1], [0, 2], [0, 3],
+            
+            // L1 -> L2 (Denser and asymmetrical)
+            [1, 5], [1, 6], 
+            [2, 5], [2, 6], [2, 7], 
+            [3, 6], [3, 7], 
+            [4, 7],
+
+            // L2 -> L3
+            [5, 8], [5, 9], 
+            [6, 9], [6, 10], 
+            [7, 10], [7, 11],
+
+            // L3 -> L4
+            [8, 12], 
+            [9, 12], [9, 13], 
+            [10, 13], 
+            [11, 13],
+
+            // L4 -> L5
+            [12, 14], [13, 14]
+        ];
+
+
+        // --- State and Mapping ---
+        const vertices = []; 
+        const correctCounts = {}; 
+        const userInputs = {};   
+        let totalVertices = 0;
+        
+        // --- DOM Elements ---
+        const container = document.getElementById('game-container');
+        const graphSvg = document.getElementById('graph-svg');
+        const statusBar = document.getElementById('status-bar');
+
+        // --- Initialization ---
+
+        function initGame() {
+            createVertexStructure();
+            calculateCorrectCounts();
+            renderEdges();
+            renderVertices();
+            updateInputStates();
+        }
+        
+        // 1. Map vertex structure and calculate screen coordinates
+        function createVertexStructure() {
+            let idCounter = 0;
+            const containerWidth = container.offsetWidth;
+
+            layerLayout.forEach((layer, lIdx) => {
+                layer.hCenters.forEach((hCenter, vIdx) => {
+                    const v = {
+                        id: idCounter,
+                        layer: lIdx,
+                        x: hCenter * H_WIDTH + 20, // 20 is left padding
+                        y: layer.yOffset,
+                        initial: (lIdx === 0), 
+                        dependencies: [], 
+                    };
+                    vertices[idCounter] = v;
+                    idCounter++;
+                });
+            });
+            totalVertices = idCounter;
+            
+            // Map dependencies (incoming edges)
+            allEdges.forEach(([sourceId, targetId]) => {
+                if (vertices[targetId]) {
+                    vertices[targetId].dependencies.push(sourceId);
+                }
+            });
+        }
+
+        // 2. Calculate correct answers using the Principle of Sum/Recurrence
+        function calculateCorrectCounts() {
+            vertices.forEach(v => {
+                if (v.initial) {
+                    correctCounts[v.id] = 1;
+                } else {
+                    let count = 0;
+                    // Sum the correct path counts of all predecessors
+                    v.dependencies.forEach(predId => {
+                        count += correctCounts[predId];
+                    });
+                    correctCounts[v.id] = count;
+                }
+            });
+        }
+
+        // 3. Render edges
+        function renderEdges() {
+            allEdges.forEach(([sourceId, targetId]) => {
+                const source = vertices[sourceId];
+                const target = vertices[targetId];
+
+                const line = document.createElementNS(SVG_NS, 'line');
+                line.setAttribute('x1', source.x);
+                line.setAttribute('y1', source.y + 15); // Start slightly below circle
+                line.setAttribute('x2', target.x);
+                line.setAttribute('y2', target.y - 15); // End slightly above circle
+                line.classList.add('dag-edge');
+                graphSvg.appendChild(line);
+            });
+        }
+
+        // 4. Render vertices
+        function renderVertices() {
+            vertices.forEach(v => {
+                const group = document.createElement('div');
+                group.classList.add('vertex-group');
+                group.style.left = `${v.x}px`;
+                group.style.top = `${v.y}px`;
+                group.dataset.id = v.id;
+                
+                const circle = document.createElement('div');
+                circle.classList.add('vertex-circle');
+
+                if (v.initial) {
+                    circle.classList.add('initial', 'correct');
+                    circle.textContent = '1';
+                    userInputs[v.id] = 1;
+                    
+                    const labelA = document.createElement('div');
+                    labelA.textContent = 'A (Start)';
+                    labelA.classList.add('label-A');
+                    group.appendChild(labelA);
+                } else {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = 0;
+                    input.maxLength = 5;
+                    input.id = `input-${v.id}`;
+                    input.dataset.id = v.id;
+                    input.disabled = true; 
+                    
+                    input.addEventListener('input', handleInput);
+                    input.addEventListener('focus', handleFocus);
+                    circle.appendChild(input);
+
+                    if (v.id === totalVertices - 1) {
+                         const labelB = document.createElement('div');
+                         labelB.textContent = 'B (End)';
+                         labelB.classList.add('label-B');
+                         group.appendChild(labelB);
+                    }
+                }
+                
+                group.appendChild(circle);
+                container.appendChild(group);
+            });
+        }
+
+        // --- Game Logic (Unchanged from previous version) ---
+
+        function updateInputStates() {
+            let solvedCount = 1; 
+            let enabledCount = 0;
+
+            for (let id = 1; id < totalVertices; id++) {
+                const v = vertices[id];
+                const inputEl = document.getElementById(`input-${v.id}`);
+                if (!inputEl) continue;
+
+                if (userInputs[id] !== undefined && userInputs[id] !== null) {
+                    solvedCount++;
+                    inputEl.disabled = true;
+                    continue;
+                }
+
+                const allDepsSolved = v.dependencies.every(depId => 
+                    userInputs[depId] !== undefined && userInputs[depId] !== null
+                );
+
+                if (allDepsSolved) {
+                    inputEl.disabled = false;
+                    inputEl.style.color = 'var(--text-main)';
+                    enabledCount++;
+                } else {
+                    inputEl.disabled = true;
+                }
+            }
+            
+            if (solvedCount === totalVertices) {
+                endGame();
+            } else if (enabledCount > 0) {
+                statusBar.textContent = `You have ${enabledCount} available vertices to calculate. Sum the path counts of the connected vertices above!`;
+            } else {
+                 statusBar.textContent = "Work layer by layer, starting from the top.";
+            }
+        }
+
+        function handleFocus(event) {
+             const input = event.target;
+             const circle = input.parentElement;
+             circle.classList.remove('incorrect');
+             circle.style.animation = 'none';
+        }
+
+        function handleInput(event) {
+            const input = event.target;
+            const id = parseInt(input.dataset.id);
+            const value = parseInt(input.value.trim());
+            const circle = input.parentElement;
+            const v = vertices[id];
+
+            circle.classList.remove('correct', 'incorrect');
+            circle.style.animation = 'none'; 
+            input.style.color = 'var(--text-main)';
+
+            if (isNaN(value)) {
+                userInputs[id] = null;
+                updateInputStates();
+                return;
+            }
+
+            if (value === correctCounts[id]) {
+                circle.classList.add('correct');
+                input.value = value;
+                input.disabled = true; 
+                userInputs[id] = value;
+                
+                setStatus(`Correct! The path count to Vertex ${id + 1} is ${value}.`, 'success');
+            } else {
+                circle.classList.add('incorrect');
+                input.value = ''; 
+                
+                const predecessors = v.dependencies.map(predId => userInputs[predId]);
+                const hintText = predecessors.join(' + ') + ` = ?`;
+
+                setStatus(`Incorrect. Check your sum: (${hintText})`, 'error');
+                circle.style.animation = 'shake 0.5s';
+                userInputs[id] = null;
+            }
+            
+            updateInputStates();
+        }
+
+        function setStatus(text, type) {
+            statusBar.textContent = text;
+            statusBar.style.color = type === 'error' ? 'var(--error)' : 
+                                     type === 'success' ? 'var(--success)' : 
+                                     'var(--text-main)';
+        }
+
+        function endGame() {
+            const finalCount = correctCounts[totalVertices - 1];
+            setStatus(`GAME COMPLETE! The total number of paths from A to B is ${finalCount}.`, 'success');
+            document.querySelectorAll('input').forEach(input => input.disabled = true);
+        }
+
+        // Start
+        initGame();
+    </script>
+</body>
+</html>

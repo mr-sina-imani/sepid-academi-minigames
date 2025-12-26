@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multinomial Coefficient Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #f9f9f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+
+        #header-expr {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        #target-term {
+            font-size: 1.8rem;
+            margin-bottom: 30px;
+            color: #555;
+        }
+
+        .highlight-target { font-weight: bold; color: black; transition: all 0.3s; }
+
+        #stack-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 30px;
+        }
+
+        .paren-row {
+            font-size: 1.5rem;
+            padding: 5px 15px;
+            background-color: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            display: flex;
+            gap: 5px;
+            transition: all 0.3s;
+        }
+
+        .paren-row.locked { background-color: #f0f0f0; border-color: #bbb; }
+
+        .term {
+            padding: 2px 5px;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .selectable-x { cursor: pointer; color: #d32f2f; }
+        .selectable-x:hover { background-color: #ffcccc; }
+        .selectable-y { cursor: pointer; color: #1565c0; }
+        .selectable-y:hover { background-color: #cce5ff; }
+        .selectable-z { cursor: pointer; color: #2e7d32; }
+        .selectable-z:hover { background-color: #c8e6c9; }
+
+        .selected-x { font-weight: 900; color: white; background-color: #d32f2f; }
+        .selected-y { font-weight: 900; color: white; background-color: #1565c0; }
+        .selected-z { font-weight: 900; color: white; background-color: #2e7d32; }
+
+        .faded { opacity: 0.15; pointer-events: none; }
+
+        #instruction {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            height: 1.5em;
+            color: #333;
+        }
+
+        #math-buildup {
+            font-size: 2rem;
+            min-height: 2.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .math-part {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.4s ease;
+        }
+        .math-visible { opacity: 1; transform: translateY(0); }
+        
+        .reset-hint {
+            position: absolute;
+            bottom: 20px;
+            color: #999;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="header-expr">(x + y + z)<sup>7</sup></div>
+    <div id="target-term">Finding: <span id="target-x">x<sup>2</sup></span><span id="target-y">y<sup>3</sup></span><span id="target-z">z<sup>2</sup></span></div>
+
+    <div id="stack-container"></div>
+
+    <div id="instruction"></div>
+
+    <div id="math-buildup">
+        <span style="font-weight: bold; margin-right: 10px;">Coeff = </span>
+        <span id="math-x" class="math-part">C(7, 2)</span>
+        <span id="math-dot1" class="math-part">&middot;</span>
+        <span id="math-y" class="math-part">C(5, 3)</span>
+        <span id="math-dot2" class="math-part">&middot;</span>
+        <span id="math-z" class="math-part">C(2, 2)</span>
+    </div>
+
+    <div class="reset-hint">Press <b>SPACE</b> to reset the game</div>
+
+    <script>
+        const TOTAL_ROWS = 7;
+        const TARGETS = { x: 2, y: 3, z: 2 };
+        const PHASES = ['x', 'y', 'z', 'finished'];
+
+        let currentPhaseIndex = 0;
+        let counts = { x: 0, y: 0, z: 0 };
+        let rowSelections = Array(TOTAL_ROWS).fill(null); 
+
+        function init() {
+            const container = document.getElementById('stack-container');
+            container.innerHTML = '';
+            for (let i = 0; i < TOTAL_ROWS; i++) {
+                const row = document.createElement('div');
+                row.className = 'paren-row';
+                row.id = `row-${i}`;
+                
+                const createTerm = (v) => {
+                    const s = document.createElement('span');
+                    s.innerText = v;
+                    s.className = `term term-${v}`;
+                    s.onclick = () => handleTermClick(i, v);
+                    return s;
+                };
+
+                row.append('(', createTerm('x'), '+', createTerm('y'), '+', createTerm('z'), ')');
+                container.appendChild(row);
+            }
+            updateUI();
+        }
+
+        function handleTermClick(rowIndex, varName) {
+            const phaseVar = PHASES[currentPhaseIndex];
+            if (varName !== phaseVar || rowSelections[rowIndex] !== null || counts[varName] >= TARGETS[varName]) return;
+
+            rowSelections[rowIndex] = varName;
+            counts[varName]++;
+            if (counts[varName] === TARGETS[varName]) currentPhaseIndex++;
+            updateUI();
+        }
+
+        function resetGame() {
+            currentPhaseIndex = 0;
+            counts = { x: 0, y: 0, z: 0 };
+            rowSelections.fill(null);
+            
+            // Hide math parts
+            document.querySelectorAll('.math-part').forEach(el => el.classList.remove('math-visible'));
+            
+            updateUI();
+        }
+
+        // Listen for Space key
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault(); // Prevent page scrolling
+                resetGame();
+            }
+        });
+
+        function updateUI() {
+            const phaseVar = PHASES[currentPhaseIndex];
+            const instr = document.getElementById('instruction');
+            
+            // Logic for instruction and target highlighting
+            const highlights = { x: 'target-x', y: 'target-y', z: 'target-z' };
+            Object.values(highlights).forEach(id => document.getElementById(id).className = '');
+            if (highlights[phaseVar]) document.getElementById(highlights[phaseVar]).className = 'highlight-target';
+
+            if (phaseVar === 'x') {
+                instr.innerHTML = `Choose <b>${TARGETS.x}</b> rows for <b>x</b>.`;
+            } else if (phaseVar === 'y') {
+                instr.innerHTML = `Choose <b>${TARGETS.y}</b> of the remaining rows for <b>y</b>.`;
+                document.getElementById('math-x').classList.add('math-visible');
+            } else if (phaseVar === 'z') {
+                instr.innerHTML = `Choose the final <b>${TARGETS.z}</b> rows for <b>z</b>.`;
+                document.getElementById('math-x').classList.add('math-visible');
+                document.getElementById('math-dot1').classList.add('math-visible');
+                document.getElementById('math-y').classList.add('math-visible');
+            } else {
+                instr.innerHTML = "<b>Complete!</b> Formula generated below.";
+                document.querySelectorAll('.math-part').forEach(el => el.classList.add('math-visible'));
+            }
+
+            // Update row visuals
+            for (let i = 0; i < TOTAL_ROWS; i++) {
+                const row = document.getElementById(`row-${i}`);
+                const sel = rowSelections[i];
+                const tx = row.querySelector('.term-x'), ty = row.querySelector('.term-y'), tz = row.querySelector('.term-z');
+                
+                [tx, ty, tz].forEach(t => t.className = t.className.split(' ')[0] + ' ' + t.className.split(' ')[1]);
+                row.classList.remove('locked');
+
+                if (sel === null) {
+                    if (phaseVar === 'x') { tx.classList.add('selectable-x'); ty.classList.add('faded'); tz.classList.add('faded'); }
+                    else if (phaseVar === 'y') { tx.classList.add('faded'); ty.classList.add('selectable-y'); tz.classList.add('faded'); }
+                    else if (phaseVar === 'z') { tx.classList.add('faded'); ty.classList.add('faded'); tz.classList.add('selectable-z'); }
+                    else { [tx, ty, tz].forEach(t => t.classList.add('faded')); }
+                } else {
+                    row.classList.add('locked');
+                    tx.classList.add(sel === 'x' ? 'selected-x' : 'faded');
+                    ty.classList.add(sel === 'y' ? 'selected-y' : 'faded');
+                    tz.classList.add(sel === 'z' ? 'selected-z' : 'faded');
+                }
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

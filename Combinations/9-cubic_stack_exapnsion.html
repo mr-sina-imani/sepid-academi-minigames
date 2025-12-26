@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cubic Expansion Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            cursor: pointer;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* General Layout */
+        #container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            transition: all 0.5s ease;
+        }
+
+        .math-text {
+            font-size: 2rem;
+            transition: all 0.5s;
+        }
+
+        /* The rows containing multipliers and boxes */
+        .expansion-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.8s ease;
+            opacity: 1;
+        }
+
+        .multiplier {
+            font-size: 2rem;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 5px;
+            transition: all 0.5s;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .box-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* The Boxes */
+        .box {
+            width: 80px; /* Smaller than previous game to fit 4 in a row */
+            height: 100px;
+            border: 2px solid #333;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #fafafa;
+            transition: all 0.5s ease;
+            font-size: 0.9rem;
+            position: relative;
+        }
+
+        .gray-box {
+            background-color: #e0e0e0;
+            border-color: #999;
+            color: #777;
+        }
+
+        /* Inside the box */
+        .term-line {
+            display: flex;
+            gap: 2px;
+        }
+        
+        .term-result {
+            position: absolute;
+            bottom: -25px;
+            font-weight: bold;
+            color: #2e7d32;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        /* Styles for text */
+        .bold { font-weight: 900; color: black !important; }
+        .faded { opacity: 0.3; }
+        .red-bg { background-color: #ffcccc; color: #d32f2f; }
+        .blue-bg { background-color: #cce5ff; color: #1565c0; }
+        
+        /* Specific animations */
+        .hidden { display: none; opacity: 0; }
+        
+        #final-result {
+            font-size: 3rem;
+            margin-top: 30px;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.5s;
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            color: #888;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body onclick="nextStep()">
+
+    <div id="header" class="math-text">(x + 1)<sup>3</sup> = (x + 1)(x + 1)<sup>2</sup></div>
+
+    <div id="container">
+        
+        <div id="row-top" class="expansion-row hidden">
+            <div id="mult-top" class="multiplier">(x + 1)</div>
+            <div class="box-container" id="boxes-top">
+                </div>
+        </div>
+
+        <div id="row-bot" class="expansion-row hidden">
+            <div id="mult-bot" class="multiplier">+ (x + 1)</div> <div class="box-container" id="boxes-bot">
+                </div>
+        </div>
+
+    </div>
+
+    <div id="final-result">x<sup>3</sup> + 3x<sup>2</sup> + 3x + 1</div>
+    <div id="hint" class="hint">Click to start expansion</div>
+
+    <script>
+        let step = 0;
+
+        // The template for the n=2 boxes (from previous game)
+        // 0=bold, 1=faded. [x, 1]
+        const basePatterns = [
+            [[1,0], [1,0]], // (x,1), (x,1) -> x*x
+            [[1,0], [0,1]], // (x,1), (1,x) -> x*1
+            [[0,1], [1,0]], // (1,x), (x,1) -> 1*x
+            [[0,1], [0,1]]  // (1,x), (1,x) -> 1*1
+        ];
+
+        const calculatedPowers = [
+            "x<sup>3</sup>", "x<sup>2</sup>", "x<sup>2</sup>", "x", 
+            "x<sup>2</sup>", "x", "x", "1"
+        ];
+
+        function createBoxHTML(pattern, topTermOverride = null) {
+            let html = '';
+            
+            // If we are in the phase where we added the 3rd parenthesis
+            if (topTermOverride) {
+                const xClass = topTermOverride === 'x' ? 'bold' : 'faded';
+                const oneClass = topTermOverride === '1' ? 'bold' : 'faded';
+                html += `<div class="term-line">(<span class="${xClass}">x</span>+<span class="${oneClass}">1</span>)</div>`;
+            }
+
+            // The existing two parentheses
+            pattern.forEach(p => {
+                const xClass = p[0] ? 'bold' : 'faded';
+                const oneClass = p[1] ? 'bold' : 'faded';
+                html += `<div class="term-line">(<span class="${xClass}">x</span>+<span class="${oneClass}">1</span>)</div>`;
+            });
+            return html;
+        }
+
+        function renderBoxes(containerId, isGray = false) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            basePatterns.forEach((pat, index) => {
+                const div = document.createElement('div');
+                div.className = `box ${isGray ? 'gray-box' : ''}`;
+                div.innerHTML = createBoxHTML(pat);
+                
+                // Add result placeholder
+                const res = document.createElement('div');
+                res.className = 'term-result';
+                // Calculate index offset for bottom row (4-7)
+                const realIndex = containerId === 'boxes-bot' ? index + 4 : index;
+                res.innerHTML = calculatedPowers[realIndex];
+                div.appendChild(res);
+                
+                container.appendChild(div);
+            });
+        }
+
+        function nextStep() {
+            const hint = document.getElementById('hint');
+            const rowTop = document.getElementById('row-top');
+            const rowBot = document.getElementById('row-bot');
+            const multTop = document.getElementById('mult-top');
+            const multBot = document.getElementById('mult-bot');
+            const header = document.getElementById('header');
+
+            // Step 1: Reveal (x+1) [Boxes]
+            if (step === 0) {
+                renderBoxes('boxes-top', false); // Normal colors initially
+                rowTop.classList.remove('hidden');
+                header.innerHTML = "= (x + 1) &middot; (Expansion of Square)";
+                hint.innerText = "Click to prepare distribution";
+                step++;
+            }
+            
+            // Step 2: Color Code and Gray Out Boxes
+            else if (step === 1) {
+                // Color the (x+1) text
+                multTop.innerHTML = "(<span class='red-bg'>x</span> + <span class='blue-bg'>1</span>)";
+                
+                // Turn boxes gray
+                const boxes = document.querySelectorAll('.box');
+                boxes.forEach(b => b.classList.add('gray-box'));
+                
+                hint.innerText = "Click to distribute (split into two groups)";
+                step++;
+            }
+
+            // Step 3: Split into two rows (Distribution)
+            else if (step === 2) {
+                // Prepare bottom row
+                renderBoxes('boxes-bot', true); // Render gray boxes
+                rowBot.classList.remove('hidden');
+                
+                // Update Multipliers to be specific
+                // Top: x (bold/red)
+                multTop.innerHTML = "<span class='red-bg' style='padding:5px 10px; border-radius:4px'>x</span>";
+                multTop.style.minWidth = "40px";
+                
+                // Bottom: 1 (bold/blue)
+                multBot.innerHTML = "+ <span class='blue-bg' style='padding:5px 10px; border-radius:4px'>1</span>";
+                multBot.style.minWidth = "40px";
+                
+                header.style.opacity = "0"; // Hide header to reduce clutter
+                hint.innerText = "Click to move the multiplier INSIDE the boxes";
+                step++;
+            }
+
+            // Step 4: Absorb (Multiplier moves inside)
+            else if (step === 3) {
+                // Hide multipliers
+                multTop.style.opacity = '0';
+                multTop.style.width = '0';
+                multTop.style.padding = '0';
+                multTop.innerHTML = '';
+                
+                multBot.style.opacity = '0';
+                multBot.style.width = '0';
+                multBot.style.padding = '0';
+                multBot.innerHTML = '';
+
+                // Update Top Boxes: Add (x+1) with x bold
+                const topBoxes = document.getElementById('boxes-top').children;
+                basePatterns.forEach((pat, i) => {
+                    const box = topBoxes[i];
+                    box.classList.remove('gray-box');
+                    // Remove result temporarily to clean HTML, we will re-add or just overwrite
+                    // Easiest is to overwrite innerHTML
+                    let content = createBoxHTML(pat, 'x'); // 'x' means top x is bold
+                    content += `<div class="term-result">${calculatedPowers[i]}</div>`;
+                    box.innerHTML = content;
+                    box.style.height = "120px"; // Grow slightly for 3rd line
+                });
+
+                // Update Bottom Boxes: Add (x+1) with 1 bold
+                const botBoxes = document.getElementById('boxes-bot').children;
+                basePatterns.forEach((pat, i) => {
+                    const box = botBoxes[i];
+                    box.classList.remove('gray-box');
+                    let content = createBoxHTML(pat, '1'); // '1' means top 1 is bold
+                    content += `<div class="term-result">${calculatedPowers[i+4]}</div>`;
+                    box.innerHTML = content;
+                    box.style.height = "120px";
+                });
+
+                hint.innerText = "Click to calculate each box";
+                step++;
+            }
+
+            // Step 5: Evaluate (Show powers below boxes)
+            else if (step === 4) {
+                const results = document.querySelectorAll('.term-result');
+                results.forEach(r => r.style.opacity = '1');
+                hint.innerText = "Click to combine like terms";
+                step++;
+            }
+
+            // Step 6: Simplify (Final Result)
+            else if (step === 5) {
+                document.getElementById('container').style.opacity = '0.1';
+                document.getElementById('final-result').style.opacity = '1';
+                document.getElementById('final-result').style.transform = 'scale(1)';
+                hint.style.display = 'none';
+                step++;
+            }
+        }
+    </script>
+</body>
+</html>

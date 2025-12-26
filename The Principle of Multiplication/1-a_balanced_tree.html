@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combinatorics Minigame: Multiplication Principle (Symmetric & Fixed)</title>
+    <style>
+        /* --- General Styling (Unchanged) --- */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f4f7f9;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px; 
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        /* --- Tree Diagram (Upper Part) --- */
+        #tree-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+            margin-bottom: 20px;
+            border: 1px dashed #ccc;
+            border-radius: 5px;
+            min-height: 300px;
+            position: relative;
+        }
+
+        .level {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 30px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .level-1 {
+            justify-content: space-evenly;
+        }
+        
+        .level-2 {
+            display: flex;
+            justify-content: space-evenly;
+            flex-wrap: nowrap;
+        }
+        
+        .children-group {
+            display: flex;
+            width: 25%; 
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .node {
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            text-align: center;
+            border-radius: 50%;
+            background-color: #a0c4ff;
+            color: #333;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+
+        .node.active {
+            /* This color indicates the *current* selection before the path is complete */
+            background-color: #ffb5a7; 
+            border: 3px solid #e05d5d;
+            transform: scale(1.25);
+        }
+
+        .node.completed {
+            /* This color indicates a node that is part of the final, completed path */
+            background-color: #c9e4de; 
+            border: 3px solid #778899; /* Changed to a grey border for final state clarity */
+        }
+
+        /* --- Lines (Edges) --- */
+        .lines-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        .tree-line {
+            stroke: #6c757d;
+            stroke-width: 2;
+            transition: stroke 0.3s ease;
+        }
+
+        .tree-line.active {
+            stroke: #e05d5d;
+            stroke-width: 3;
+        }
+
+        /* --- Code Placeholder (Lower Part - Unchanged) --- */
+        #code-placeholder-container {
+            text-align: center;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        .digit-placeholder {
+            display: inline-block;
+            width: 60px;
+            height: 80px;
+            line-height: 80px;
+            font-size: 3em;
+            font-weight: bold;
+            text-align: center;
+            margin: 0 10px;
+            border-bottom: 3px solid #495057;
+            background-color: white;
+            color: #495057;
+            transition: all 0.3s ease;
+        }
+
+        .digit-placeholder.filled {
+            background-color: #d1e7dd;
+            color: #0f5132;
+        }
+
+        /* --- Instruction and Status (Unchanged) --- */
+        #status-message {
+            margin-top: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-align: center;
+            color: #333;
+        }
+        
+        .instruction {
+            color: #007bff;
+        }
+
+        .success {
+            color: #198754;
+        }
+
+        .error {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🔢 Multiplication Principle Tree Game</h2>
+        <p>Use your keyboard to enter a two-digit code where the first digit is $\mathbf{1, 2, 3,}$ or $\mathbf{4}$, and the second is $\mathbf{7, 8,}$ or $\mathbf{9}$.</p>
+        
+        <div id="tree-container">
+            </div>
+
+        <div id="code-placeholder-container">
+            <div id="digit1" class="digit-placeholder">?</div>
+            <div id="digit2" class="digit-placeholder">?</div>
+        </div>
+
+        <div id="status-message">
+            <span class="instruction">Press $\mathbf{1, 2, 3,}$ or $\mathbf{4}$ to start.</span>
+        </div>
+    </div>
+    
+    <script>
+        // --- Configuration (Unchanged) ---
+        const LEVEL1_OPTIONS = ['1', '2', '3', '4'];
+        const LEVEL2_OPTIONS = ['7', '8', '9'];
+        const TOTAL_CODES = LEVEL1_OPTIONS.length * LEVEL2_OPTIONS.length;
+
+        // --- Game State & DOM (Unchanged) ---
+        let currentStage = 0;
+        let currentCode = [];
+        let activeNodeId = 'root';
+        const treeContainer = document.getElementById('tree-container');
+        const digit1Placeholder = document.getElementById('digit1');
+        const digit2Placeholder = document.getElementById('digit2');
+        const statusMessage = document.getElementById('status-message');
+        const getNodeId = (level, index) => `node-l${level}-i${index}`;
+        
+        // --- Tree Generation (Omitted for brevity, assumed correct) ---
+        function generateTree() {
+            treeContainer.innerHTML = ''; 
+            
+            // 1. Root Node (Level 0)
+            const rootLevel = document.createElement('div');
+            rootLevel.classList.add('level', 'level-0');
+            const rootNode = document.createElement('div');
+            rootNode.id = 'root';
+            rootNode.classList.add('node', 'active');
+            rootNode.textContent = '';
+            rootLevel.appendChild(rootNode);
+            treeContainer.appendChild(rootLevel);
+
+            // Lines container 
+            const linesContainer = document.createElement('div');
+            linesContainer.classList.add('lines-container');
+            treeContainer.appendChild(linesContainer);
+            
+            // 2. Level 1 Nodes
+            const level1Nodes = [];
+            const level1Level = document.createElement('div');
+            level1Level.classList.add('level', 'level-1');
+            LEVEL1_OPTIONS.forEach((digit, i) => {
+                const node = document.createElement('div');
+                node.id = getNodeId(1, i);
+                node.classList.add('node');
+                node.textContent = digit;
+                level1Level.appendChild(node);
+                level1Nodes.push(node);
+            });
+            treeContainer.appendChild(level1Level);
+
+            // 3. Level 2 Nodes (Leaves) - Grouped
+            const level2Level = document.createElement('div');
+            level2Level.classList.add('level', 'level-2');
+            let leafIndex = 0;
+            
+            LEVEL1_OPTIONS.forEach((digit1, i1) => {
+                const group = document.createElement('div');
+                group.classList.add('children-group');
+                
+                LEVEL2_OPTIONS.forEach((digit2, i2) => {
+                    const node = document.createElement('div');
+                    node.id = getNodeId(2, leafIndex);
+                    node.classList.add('node');
+                    node.textContent = digit1 + digit2;
+                    group.appendChild(node);
+                    leafIndex++;
+                });
+                level2Level.appendChild(group); 
+            });
+            treeContainer.appendChild(level2Level);
+            
+            // 4. Draw Lines (Edges)
+            requestAnimationFrame(() => {
+                drawTreeLines(linesContainer, rootNode, level1Nodes);
+                updateTreeHighlight();
+            });
+        }
+
+        // --- Draw Lines Function (Omitted for brevity, assumed correct) ---
+        function drawTreeLines(container, rootNode, level1Nodes) {
+            
+            container.innerHTML = ''; 
+            
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            container.appendChild(svg);
+            
+            const containerRect = treeContainer.getBoundingClientRect();
+            
+            const getCoords = (el) => {
+                const rect = el.getBoundingClientRect();
+                return {
+                    x: rect.left + rect.width / 2 - containerRect.left,
+                    y: rect.top + rect.height / 2 - containerRect.top
+                };
+            };
+
+            const drawLine = (startEl, endEl, lineId) => {
+                const start = getCoords(startEl);
+                const end = getCoords(endEl);
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', start.x);
+                line.setAttribute('y1', start.y);
+                line.setAttribute('x2', end.x);
+                line.setAttribute('y2', end.y);
+                line.setAttribute('class', 'tree-line');
+                line.id = lineId;
+                svg.appendChild(line);
+            };
+
+            level1Nodes.forEach((node, i) => {
+                drawLine(rootNode, node, `line-l0-to-l1-i${i}`);
+            });
+
+            let leafIndex = 0;
+            LEVEL1_OPTIONS.forEach((digit1, i1) => {
+                const parentNode = level1Nodes[i1];
+                
+                for(let i2 = 0; i2 < LEVEL2_OPTIONS.length; i2++) {
+                    const childNode = document.getElementById(getNodeId(2, leafIndex));
+                    if (childNode) { 
+                        drawLine(parentNode, childNode, `line-l1-i${i1}-to-l2-i${leafIndex}`);
+                    }
+                    leafIndex++;
+                }
+            });
+        }
+        
+        // --- Update Functions (FIXED) ---
+        
+        function updateDisplay() {
+            digit1Placeholder.textContent = currentCode[0] || '?';
+            digit2Placeholder.textContent = currentCode[1] || '?';
+            digit1Placeholder.classList.toggle('filled', !!currentCode[0]);
+            digit2Placeholder.classList.toggle('filled', !!currentCode[1]);
+
+            if (currentStage === 0) {
+                statusMessage.innerHTML = `<span class="instruction">Press $\mathbf{${LEVEL1_OPTIONS.join(', ')}}$ for the first digit.</span>`;
+            } else if (currentStage === 1) {
+                statusMessage.innerHTML = `<span class="instruction">Press $\mathbf{${LEVEL2_OPTIONS.join(', ')}}$ for the second digit.</span>`;
+            } else if (currentStage === 2) {
+                statusMessage.innerHTML = `<span class="success">Code completed: $\mathbf{${currentCode.join('')}}$. Total possible codes: ${TOTAL_CODES}. Press $\mathbf{Space}$ to reset.</span>`;
+            }
+        }
+
+        function updateTreeHighlight() {
+            // 1. Reset all highlights
+            document.querySelectorAll('.node').forEach(node => node.classList.remove('active', 'completed'));
+            document.querySelectorAll('.tree-line').forEach(line => line.classList.remove('active'));
+
+            if (currentStage === 0) {
+                // Only the root is active
+                document.getElementById('root').classList.add('active');
+                return;
+            }
+            
+            // --- Logic for Stages 1 and 2 ---
+            
+            const digit1 = currentCode[0];
+            const i1 = LEVEL1_OPTIONS.indexOf(digit1);
+            
+            const rootNode = document.getElementById('root');
+            const node1 = document.getElementById(getNodeId(1, i1));
+            const line01 = document.getElementById(`line-l0-to-l1-i${i1}`);
+            
+            // Highlight the first step (Root -> Level 1 Node)
+            if (rootNode) rootNode.classList.add('completed');
+            if (line01) line01.classList.add('active');
+            
+            if (currentStage === 1) {
+                // If only one digit entered, Level 1 node is ACTIVE
+                if (node1) node1.classList.add('active');
+            } else if (currentStage === 2) {
+                // If two digits entered, Level 1 node is COMPLETED
+                if (node1) node1.classList.add('completed');
+
+                const digit2 = currentCode[1];
+                const i2 = LEVEL2_OPTIONS.indexOf(digit2);
+                
+                // Find the correct leaf node index
+                let leafIndex = 0;
+                for (let i = 0; i < i1; i++) {
+                    leafIndex += LEVEL2_OPTIONS.length;
+                }
+                leafIndex += i2;
+
+                const leafNode = document.getElementById(getNodeId(2, leafIndex));
+                const line12 = document.getElementById(`line-l1-i${i1}-to-l2-i${leafIndex}`);
+                
+                // Highlight the second step (Level 1 Node -> Leaf Node)
+                if (line12) line12.classList.add('active');
+                
+                // *** FIX APPLIED HERE: Ensure the leaf node gets the completed style ***
+                if (leafNode) {
+                    leafNode.classList.add('active');
+                    //leafNode.classList.remove('active'); // Ensure active is removed
+                }
+            }
+        }
+
+        // --- Game Logic (Unchanged) ---
+        function handleInput(key) {
+            key = key.toUpperCase();
+            
+            if (currentStage === 2) {
+                if (key === ' ') {
+                    resetGame();
+                }
+                return;
+            }
+
+            let validMove = false;
+            
+            if (currentStage === 0) {
+                if (LEVEL1_OPTIONS.includes(key)) {
+                    currentCode.push(key);
+                    const i1 = LEVEL1_OPTIONS.indexOf(key);
+                    activeNodeId = getNodeId(1, i1);
+                    currentStage = 1;
+                    validMove = true;
+                }
+            } else if (currentStage === 1) {
+                if (LEVEL2_OPTIONS.includes(key)) {
+                    currentCode.push(key);
+                    
+                    const digit1 = currentCode[0];
+                    const i1 = LEVEL1_OPTIONS.indexOf(digit1);
+                    const i2 = LEVEL2_OPTIONS.indexOf(key);
+                    
+                    let leafIndex = 0;
+                    for (let i = 0; i < i1; i++) {
+                        leafIndex += LEVEL2_OPTIONS.length;
+                    }
+                    leafIndex += i2;
+
+                    activeNodeId = getNodeId(2, leafIndex);
+                    currentStage = 2;
+                    validMove = true;
+                }
+            }
+
+            if (validMove) {
+                updateDisplay();
+                updateTreeHighlight();
+            } else if (key.match(/[0-9]/)) {
+                statusMessage.innerHTML = `<span class="error">Invalid input: $\mathbf{${key}}$. ${currentStage === 0 ? 'Choose 1, 2, 3, or 4.' : 'Choose 7, 8, or 9.'}</span>`;
+            }
+        }
+
+        function resetGame() {
+            currentStage = 0;
+            currentCode = [];
+            activeNodeId = 'root';
+            
+            updateDisplay();
+            updateTreeHighlight();
+        }
+
+        // --- Event Listener & Initialization (Unchanged) ---
+        document.addEventListener('keydown', (event) => {
+            if (event.key.length === 1 && event.key.match(/[0-9]/) || event.key === ' ') {
+                handleInput(event.key);
+            }
+        });
+
+        window.onload = () => {
+            generateTree();
+            resetGame();
+        };
+
+        window.addEventListener('resize', () => {
+            generateTree(); 
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Grid Path Minigame (SVG)</title>
+  <style>
+    body {
+      font-family: serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    svg {
+      border: 1px solid #333;
+      background: #fafafa;
+    }
+
+    .info {
+      margin-top: 10px;
+      font-family: sans-serif;
+    }
+
+    .grid-line {
+      stroke: #aaa;
+      stroke-width: 1;
+    }
+
+    .path-horizontal {
+      stroke: blue;
+      stroke-width: 3;
+      fill: none;
+    }
+
+    .path-vertical {
+      stroke: #777;
+      stroke-width: 3;
+      fill: none;
+    }
+
+    .player {
+      fill: red;
+    }
+
+    .goal {
+      fill: green;
+    }
+
+    .label {
+      font-size: 14px;
+      dominant-baseline: middle;
+    }
+
+    .label.active {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<svg id="svg" width="700" height="420"></svg>
+
+<div class="info">
+  Use ↑ (up) and → (right) arrow keys to move. Press space to reset.
+</div>
+
+<script>
+  const svg = document.getElementById("svg");
+
+  const n = 8;
+  const m = 3;
+
+  const padding = 40;
+  const labelMargin = 80;
+
+  const width = svg.viewBox?.baseVal?.width || svg.clientWidth;
+  const height = svg.viewBox?.baseVal?.height || svg.clientHeight;
+
+  const cellSize = Math.min(
+    (width - 2 * padding - labelMargin) / n,
+    (height - 2 * padding) / m
+  );
+
+  let x = 0;
+  let y = 0;
+
+  let path = [{ x: 0, y: 0 }];
+  let xVars = Array(m + 1).fill(0);
+
+  function sx(x) {
+    return padding + x * cellSize;
+  }
+
+  function sy(y) {
+    return height - padding - y * cellSize;
+  }
+
+  function clearSVG() {
+    svg.innerHTML = "";
+  }
+
+  function drawLine(x1, y1, x2, y2, cls) {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", x1);
+    line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", y2);
+    line.setAttribute("class", cls);
+    svg.appendChild(line);
+  }
+
+  function drawCircle(cx, cy, r, cls) {
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("cx", cx);
+    c.setAttribute("cy", cy);
+    c.setAttribute("r", r);
+    c.setAttribute("class", cls);
+    svg.appendChild(c);
+  }
+
+  function drawText(text, x, y, cls) {
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.textContent = text;
+    t.setAttribute("x", x);
+    t.setAttribute("y", y);
+    t.setAttribute("class", cls);
+    svg.appendChild(t);
+  }
+
+  function drawGrid() {
+    for (let i = 0; i <= n; i++) {
+      drawLine(sx(i), sy(0), sx(i), sy(m), "grid-line");
+    }
+    for (let j = 0; j <= m; j++) {
+      drawLine(sx(0), sy(j), sx(n), sy(j), "grid-line");
+    }
+  }
+
+  function drawPath() {
+    for (let i = 1; i < path.length; i++) {
+      const p0 = path[i - 1];
+      const p1 = path[i];
+
+      const cls =
+        p1.x === p0.x ? "path-vertical" : "path-horizontal";
+
+      drawLine(
+        sx(p0.x),
+        sy(p0.y),
+        sx(p1.x),
+        sy(p1.y),
+        cls
+      );
+    }
+  }
+
+  function drawLabels() {
+    const lx = sx(n) + 12;
+    for (let i = 0; i <= m; i++) {
+      drawText(
+        `x_${i} = ${xVars[i]}`,
+        lx,
+        sy(i),
+        i === y ? "label active" : "label"
+      );
+    }
+  }
+
+  function redraw() {
+    clearSVG();
+    drawGrid();
+    drawPath();
+    drawLabels();
+    drawCircle(sx(n), sy(m), 6, "goal");
+    drawCircle(sx(x), sy(y), 6, "player");
+  }
+
+  function resetGame() {
+    x = 0;
+    y = 0;
+    path = [{ x: 0, y: 0 }];
+    xVars = Array(m + 1).fill(0);
+    redraw();
+  }
+
+  document.addEventListener("keydown", (e) => {
+    let moved = false;
+
+    if (e.key === "ArrowUp" && y < m) {
+      y++;
+      moved = true;
+    }
+
+    if (e.key === "ArrowRight" && x < n) {
+      x++;
+      xVars[y]++;
+      moved = true;
+    }
+
+    if (e.key === " ") {
+      e.preventDefault();
+      resetGame();
+      return;
+    }
+
+    if (moved) {
+      path.push({ x, y });
+      redraw();
+    }
+  });
+
+  redraw();
+</script>
+
+</body>
+</html>
+

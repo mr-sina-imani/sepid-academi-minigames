@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combinatorics Minigame: Permutations</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f6f8fa;
+            color: #333;
+        }
+
+        h1 {
+            /*color: #4f53d9; /* Red color for Permutations theme */
+            margin-bottom: 0.5em;
+        }
+
+        p.problem {
+            font-size: 1.1em;
+            max-width: 700px;
+            text-align: center;
+            margin-bottom: 2em;
+            padding: 15px;
+            border: 1px solid #f2dede;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .code-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .digit-placeholder {
+            width: 60px;
+            height: 80px;
+            font-size: 3em;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #ccc;
+            border-radius: 8px;
+            background-color: #fff;
+            transition: border-color 0.3s, background-color 0.3s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .digit-label {
+            font-size: 0.5em;
+            color: #6c757d;
+            position: absolute;
+            top: 5px;
+        }
+
+        .active {
+            border-color: #d9534f;
+            background-color: #dddddd;
+        }
+
+        .options-container {
+            min-height: 40px;
+            margin-bottom: 20px;
+        }
+
+        .options-list {
+            font-size: 1.2em;
+            padding: 10px 20px;
+            border-radius: 5px;
+            background-color: #5bc0de; /* Info color for options */
+            color: white;
+            font-weight: bold;
+        }
+
+        .message {
+            font-size: 1.1em;
+            color: #d9534f;
+            font-weight: bold;
+        }
+
+        .message.success {
+            color: #5cb85c; /* Success green */
+        }
+
+        .message.error {
+            color: #dc3545;
+        }
+
+        .instruction {
+            margin-top: 1em;
+            padding: 10px;
+            background-color: #eee;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .instruction strong {
+            color: #d9534f;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Permutation Minigame</h1>
+
+    <div class="code-container" id="code-container">
+        </div>
+
+    <div class="options-container">
+        <div id="options-display"></div>
+    </div>
+
+    <p id="message" class="message"></p>
+
+    <p class="instruction">
+        <span id="current-action"></span>
+    </p>
+
+    <script>
+        const NUM_POSITIONS = 5;
+        const codeContainerEl = document.getElementById('code-container');
+        const optionsEl = document.getElementById('options-display');
+        const actionEl = document.getElementById('current-action');
+
+        let state = {
+            permutation: [], // Stores the selected digits, up to 5
+            phase: 1,        // 1 to 5: Input current position, 6: Complete
+            availableDigits: Array.from({ length: 5 }, (_, i) => i+1) // [1, ..., 5]
+        };
+
+        // --- Core Logic ---
+
+        function updateAvailableDigits() {
+            // Re-calculate the set of available digits: [0-9] minus digits in state.permutation
+            const usedDigits = new Set(state.permutation);
+            state.availableDigits = Array.from({ length: 5}, (_, i) => i+1)
+                .filter(digit => !usedDigits.has(digit));
+        }
+
+        // --- UI Updates ---
+
+        function renderPermutationSlots() {
+            codeContainerEl.innerHTML = '';
+            for (let i = 0; i < NUM_POSITIONS; i++) {
+                const digitEl = document.createElement('div');
+                digitEl.className = 'digit-placeholder';
+                digitEl.id = `digit-${i + 1}`;
+                
+                const labelEl = document.createElement('div');
+                labelEl.className = 'digit-label';
+                /*labelEl.textContent = `P${i + 1}`;*/
+
+                // Set content: selected digit or placeholder underscore
+                const digitContent = state.permutation[i] !== undefined ? state.permutation[i] : '_';
+                
+                digitEl.appendChild(labelEl);
+                
+                const contentEl = document.createElement('div');
+                contentEl.textContent = digitContent;
+                digitEl.appendChild(contentEl);
+
+                // Highlight the slot being currently entered (phase - 1 = index)
+                if (state.phase === i + 1) {
+                    digitEl.classList.add('active');
+                }
+                codeContainerEl.appendChild(digitEl);
+            }
+        }
+
+        function updateUI() {
+            renderPermutationSlots();
+            
+            optionsEl.innerHTML = '';
+
+            if (state.phase <= NUM_POSITIONS) {
+                // Show available options
+                const actionText = `Input Position ${state.phase}`;
+                /*actionEl.textContent = actionText;*/
+
+                optionsEl.innerHTML = `<div class="options-list">
+                    ${state.availableDigits.join(' ')}
+                </div>`;
+            } else {
+                // Game Complete
+            }
+        }
+
+        function resetGame() {
+            state.permutation = [];
+            state.phase = 1;
+            state.availableDigits = Array.from({ length: 5 }, (_, i) => i+1);
+            updateUI();
+        }
+
+        // --- Event Listener ---
+
+        document.addEventListener('keydown', (event) => {
+            const key = event.key;
+
+            // Global reset on Spacebar
+            if (key === ' ') {
+                event.preventDefault(); // Prevent spacebar from scrolling
+                resetGame();
+                return;
+            }
+
+            // Only proceed if the game is in an input phase (phase 1 through 5)
+            if (state.phase > NUM_POSITIONS) {
+                return; 
+            }
+
+            // Check if the key is a single digit (0-9)
+            const digit = parseInt(key);
+            if (isNaN(digit) || digit < 0 || digit > 9) {
+                return; // Ignore non-digit keys
+            }
+
+            // --- Permutation Input Logic ---
+            
+            if (state.availableDigits.includes(digit)) {
+                // 1. Valid digit chosen (not already used)
+                state.permutation.push(digit);
+                
+                // 2. Advance phase
+                state.phase++;
+
+                // 3. Update available digits for the next step
+                updateAvailableDigits(); 
+                
+                // 4. Update the display
+                updateUI();
+            } else {
+                // Invalid digit chosen (already used or not 0-9)
+               
+                const used = state.permutation.includes(digit) ? ` (${digit} is already used)` : '';
+            }
+        });
+
+        // Initialize the game state when the page loads
+        resetGame();
+
+    </script>
+
+</body>
+</html>

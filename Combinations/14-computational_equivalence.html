@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizing Factorial Simplification</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --text-color: #334155;
+            --math-font: "Times New Roman", Times, serif;
+            --highlight: #3b82f6;
+            --cancel-color: #cbd5e1;
+            --strike-color: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .instruction {
+            margin-bottom: 3rem;
+            height: 30px;
+            font-size: 1.1rem;
+            color: #475569;
+            font-weight: 500;
+        }
+
+        .formula-container {
+            font-family: var(--math-font);
+            font-size: 3rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .fraction {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .numerator, .denominator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 1.2em;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .numerator {
+            border-bottom: 3px solid currentColor;
+            padding-bottom: 5px;
+        }
+
+        .denominator {
+            padding-top: 10px;
+        }
+
+        .term {
+            display: inline-block;
+            position: relative;
+            transition: all 0.5s ease;
+            white-space: nowrap;
+        }
+
+        .term.interactive {
+            cursor: pointer;
+            color: var(--highlight);
+            text-decoration: underline dotted;
+        }
+
+        .times {
+            margin: 0 0.15rem;
+            color: #94a3b8;
+            font-size: 0.8em;
+            transition: all 0.5s ease;
+            display: inline-block;
+        }
+
+        /* Cancellation Strike */
+        .cancelled {
+            color: var(--cancel-color) !important;
+        }
+        .cancelled::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: -10%;
+            width: 120%;
+            height: 2px;
+            background-color: var(--strike-color);
+            transform: rotate(-25deg);
+        }
+
+        /* The Clean-up Animation */
+        .vanish {
+            width: 0 !important;
+            opacity: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            transform: scale(0);
+            pointer-events: none;
+        }
+
+        .brace-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .brace-svg {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            height: 15px;
+            transition: opacity 0.3s;
+        }
+
+        .brace-label {
+            position: absolute;
+            top: 130%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.2rem;
+            color: #64748b;
+        }
+
+        #actionBtn {
+            margin-top: 4rem;
+            padding: 12px 24px;
+            background-color: var(--highlight);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        #actionBtn.visible { visibility: visible; opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="instruction" id="instruction">Click the factorials to expand them.</div>
+
+    <div class="formula-container">
+        <div class="lhs">C(7, 3) = </div>
+        <div class="fraction">
+            <div class="numerator" id="num">
+                <span class="term interactive" id="n-fact">7!</span>
+            </div>
+            <div class="denominator" id="den">
+                <div class="brace-wrapper" id="nr-wrapper">
+                    <span class="term interactive" id="nr-fact">(7-3)!</span>
+                    <svg class="brace-svg" id="brace" viewBox="0 0 100 20" preserveAspectRatio="none">
+                        <path d="M0,0 Q5,20 50,20 T100,0" fill="none" stroke="#64748b" stroke-width="2"/>
+                    </svg>
+                    <span class="brace-label" id="brace-text">4!</span>
+                </div>
+                <span class="times vanish" id="mid-times">&times;</span>
+                <span class="term" id="r-fact">3!</span>
+            </div>
+        </div>
+    </div>
+
+    <button id="actionBtn">Clean up the fraction</button>
+
+<script>
+const game = {
+    nExpanded: false,
+    nrExpanded: false,
+    cancelled: 0,
+
+    init() {
+        document.getElementById('n-fact').onclick = () => this.expandN();
+        document.getElementById('nr-fact').onclick = () => this.expandNR();
+        document.getElementById('actionBtn').onclick = () => this.finalize();
+    },
+
+    expandN() {
+        this.nExpanded = true;
+        const container = document.getElementById('num');
+        container.innerHTML = [7,6,5,4,3,2,1].map(n => 
+            `<span class="term" data-val="${n}">${n}</span>`
+        ).join('<span class="times">&times;</span>');
+        this.checkExpansions();
+    },
+
+    expandNR() {
+        this.nrExpanded = true;
+        document.getElementById('brace').style.opacity = '0';
+        document.getElementById('brace-text').style.opacity = '0';
+        
+        const wrapper = document.getElementById('nr-wrapper');
+        wrapper.innerHTML = [4,3,2,1].map(n => 
+            `<span class="term" data-val="${n}">${n}</span>`
+        ).join('<span class="times">&times;</span>');
+        
+        document.getElementById('mid-times').classList.remove('vanish');
+        this.checkExpansions();
+    },
+
+    checkExpansions() {
+        if (this.nExpanded && this.nrExpanded) {
+            document.getElementById('instruction').textContent = "Cancel common terms (1-4) in numerator and denominator.";
+            this.enableCancellation();
+        }
+    },
+
+    enableCancellation() {
+        const terms = document.querySelectorAll('.term[data-val]');
+        terms.forEach(t => {
+            const val = parseInt(t.getAttribute('data-val'));
+            if (val <= 4) {
+                t.style.cursor = 'pointer';
+                t.onclick = () => this.cancel(val);
+            }
+        });
+    },
+
+    cancel(val) {
+        const pairs = document.querySelectorAll(`.term[data-val="${val}"]`);
+        pairs.forEach(p => p.classList.add('cancelled'));
+        this.cancelled++;
+        if (this.cancelled === 4) {
+            document.getElementById('instruction').textContent = "Expand the remaining 3!";
+            const r = document.getElementById('r-fact');
+            r.classList.add('interactive');
+            r.onclick = () => this.expandR();
+        }
+    },
+
+    expandR() {
+        const r = document.getElementById('r-fact');
+        r.outerHTML = [3,2,1].map(n => `<span class="term final-r">${n}</span>`).join('<span class="times">&times;</span>');
+        document.getElementById('instruction').textContent = "Ready to clean up?";
+        document.getElementById('actionBtn').classList.add('visible');
+    },
+
+    finalize() {
+        // 1. Identify all cancelled numbers
+        const cancelled = document.querySelectorAll('.cancelled');
+        cancelled.forEach(el => {
+            el.classList.add('vanish');
+            // Remove the 'x' immediately following a cancelled number
+            if (el.nextElementSibling && el.nextElementSibling.classList.contains('times')) {
+                el.nextElementSibling.classList.add('vanish');
+            }
+            // Logic fix: if there's no next 'x', check the previous one (to handle the end of the list)
+            if (el.previousElementSibling && el.previousElementSibling.classList.contains('times')) {
+                el.previousElementSibling.classList.add('vanish');
+            }
+        });
+
+        // 2. Hide the divider 'x' between (n-r)! and r!
+        document.getElementById('mid-times').classList.add('vanish');
+
+        document.getElementById('instruction').textContent = "Simplified: C(7,3) = (7×6×5) / (3×2×1)";
+        document.getElementById('actionBtn').classList.remove('visible');
+    }
+};
+
+game.init();
+</script>
+</body>
+</html>

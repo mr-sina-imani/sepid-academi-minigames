@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combinatorics Minigame: Principle of Sum (B Positive, Line to Dead-End)</title>
+    <style>
+        /* --- General Styling (Unchanged) --- */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f4f7f9;
+        }
+
+        .container {
+            width: 95%;
+            max-width: 1200px;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        /* --- Tree Diagram (Upper Part) --- */
+        #tree-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+            margin-bottom: 20px;
+            border: 1px dashed #ccc;
+            border-radius: 5px;
+            min-height: 350px;
+            position: relative;
+            overflow-x: auto;
+        }
+
+        .level {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 30px;
+            position: relative;
+            z-index: 10;
+            padding: 0 10px;
+        }
+
+        .level-1 {
+            justify-content: space-evenly; 
+        }
+        
+        .level-2 {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: nowrap;
+        }
+        
+        .children-group {
+            display: flex;
+            justify-content: center;
+            gap: 5px; 
+            min-width: 40px; 
+        }
+        
+        .node {
+            width: 35px;
+            height: 35px;
+            line-height: 35px;
+            text-align: center;
+            border-radius: 50%;
+            background-color: #a0c4ff;
+            color: #333;
+            font-weight: bold;
+            font-size: 0.8em; 
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+
+        .node.active {
+            background-color: #ffb5a7; 
+            border: 3px solid #e05d5d;
+            transform: scale(1.1);
+        }
+
+        .node.completed {
+            background-color: #c9e4de; 
+            border: 3px solid #778899;
+        }
+        
+        .node.dead-end {
+            /*background-color: #e9ecef;
+            color: #6c757d;
+            border: 2px solid #adb5bd;*/
+        }
+
+        /* --- Lines (Edges) --- */
+        .lines-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        .tree-line {
+            stroke: #6c757d;
+            stroke-width: 2;
+            transition: stroke 0.3s ease;
+        }
+
+        .tree-line.active {
+            stroke: #e05d5d;
+            stroke-width: 3;
+        }
+        
+        /* New style for dead-end line (optional, but helpful) */
+        .tree-line.dead-end-line {
+            /*stroke: #adb5bd; /* Match the dead-end node color */
+           /* stroke-dasharray: 4; /* Make it a dashed line */
+        }
+
+        /* --- Code Placeholder (Lower Part - Unchanged) --- */
+        #code-placeholder-container {
+            text-align: center;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        .digit-placeholder {
+            display: inline-block;
+            width: 60px;
+            height: 80px;
+            line-height: 80px;
+            font-size: 3em;
+            font-weight: bold;
+            text-align: center;
+            margin: 0 10px;
+            border-bottom: 3px solid #495057;
+            background-color: white;
+            color: #495057;
+            transition: all 0.3s ease;
+        }
+
+        .digit-placeholder.filled {
+            background-color: #d1e7dd;
+            color: #0f5132;
+        }
+
+        /* --- Instruction and Status (Unchanged) --- */
+        #status-message {
+            margin-top: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-align: center;
+            color: #333;
+        }
+        
+        .instruction {
+            color: #007bff;
+        }
+
+        .success {
+            color: #198754;
+        }
+
+        .error {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>➕ Principle of Sum Tree Game: Second Digit Positive (B > 0)</h2>
+        <p>Enter a two-digit code $\mathbf{AB}$ where the second digit $\mathbf{B}$ is a multiple of the first $\mathbf{A}$, AND $\mathbf{B}$ must be positive (not $\mathbf{0}$).</p>
+        
+        <div id="tree-container">
+            </div>
+
+        <div id="code-placeholder-container">
+            <div id="digit1" class="digit-placeholder">?</div>
+            <div id="digit2" class="digit-placeholder">?</div>
+        </div>
+
+        <div id="status-message">
+            <span class="instruction">Press $\mathbf{0}$ through $\mathbf{9}$ to choose the first digit.</span>
+        </div>
+    </div>
+    
+    <script>
+        // --- Configuration (UNCHANGED) ---
+        const LEVEL1_OPTIONS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        
+        const BRANCH_CONSTRAINTS = {
+            '0': [], 
+            '1': ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+            '2': ['2', '4', '6', '8'],
+            '3': ['3', '6', '9'],
+            '4': ['4', '8'],
+            '5': ['5'],
+            '6': ['6'],
+            '7': ['7'],
+            '8': ['8'],
+            '9': ['9']
+        };
+        
+        const TOTAL_CODES = Object.values(BRANCH_CONSTRAINTS).reduce((sum, arr) => sum + arr.length, 0); // 23
+
+        // --- Game State & DOM (Unchanged) ---
+        let currentStage = 0;
+        let currentCode = [];
+        let activeNodeId = 'root';
+        const treeContainer = document.getElementById('tree-container');
+        const digit1Placeholder = document.getElementById('digit1');
+        const digit2Placeholder = document.getElementById('digit2');
+        const statusMessage = document.getElementById('status-message');
+        const getNodeId = (level, index) => `node-l${level}-i${index}`;
+        
+        // --- Tree Generation (Minor change to group width calculation) ---
+        function generateTree() {
+            treeContainer.innerHTML = ''; 
+            
+            // 1. Root Node (Level 0)
+            const rootLevel = document.createElement('div');
+            rootLevel.classList.add('level', 'level-0');
+            const rootNode = document.createElement('div');
+            rootNode.id = 'root';
+            rootNode.classList.add('node', 'active');
+            rootNode.textContent = 'START';
+            rootLevel.appendChild(rootNode);
+            treeContainer.appendChild(rootLevel);
+
+            // Lines container 
+            const linesContainer = document.createElement('div');
+            linesContainer.classList.add('lines-container');
+            treeContainer.appendChild(linesContainer);
+            
+            // 2. Level 1 Nodes (10 Nodes)
+            const level1Nodes = [];
+            const level1Level = document.createElement('div');
+            level1Level.classList.add('level', 'level-1');
+            LEVEL1_OPTIONS.forEach((digit, i) => {
+                const node = document.createElement('div');
+                node.id = getNodeId(1, i);
+                node.classList.add('node');
+                node.textContent = digit;
+                
+                // Add dead-end class for the '0' node
+                if (BRANCH_CONSTRAINTS[digit].length === 0) {
+                    node.classList.add('dead-end');
+                }
+                
+                level1Level.appendChild(node);
+                level1Nodes.push(node);
+            });
+            treeContainer.appendChild(level1Level);
+
+            // 3. Level 2 Nodes (Leaves - Asymmetrically Grouped)
+            const level2Level = document.createElement('div');
+            level2Level.classList.add('level', 'level-2');
+            let leafIndex = 0;
+            
+            LEVEL1_OPTIONS.forEach((digit1, i1) => {
+                const group = document.createElement('div');
+                group.classList.add('children-group');
+                
+                const options2 = BRANCH_CONSTRAINTS[digit1];
+                
+                options2.forEach((digit2, i2) => {
+                    const node = document.createElement('div');
+                    node.id = getNodeId(2, leafIndex);
+                    node.classList.add('node');
+                    node.textContent = digit1 + digit2;
+                    group.appendChild(node);
+                    leafIndex++;
+                });
+                
+                // Set flexible width for visualization
+                const totalLeaves = options2.length;
+                // Give all non-zero groups a base width, and size '1' (9 leaves) appropriately
+                const groupWidth = totalLeaves === 0 ? '5%' : totalLeaves === 9 ? '25%' : (totalLeaves * 4) + '%'; 
+                group.style.flexBasis = groupWidth;
+                
+                level2Level.appendChild(group); 
+            });
+            treeContainer.appendChild(level2Level);
+            
+            // 4. Draw Lines (Edges)
+            requestAnimationFrame(() => {
+                drawTreeLines(linesContainer, rootNode, level1Nodes);
+                updateTreeHighlight();
+            });
+        }
+
+        // --- Draw Lines Function (FIXED: Always draw the line from root to Level 1) ---
+        function drawTreeLines(container, rootNode, level1Nodes) {
+            
+            container.innerHTML = ''; 
+            
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            container.appendChild(svg);
+            
+            const containerRect = treeContainer.getBoundingClientRect();
+            
+            const getCoords = (el) => {
+                const rect = el.getBoundingClientRect();
+                return {
+                    x: rect.left + rect.width / 2 - containerRect.left,
+                    y: rect.top + rect.height / 2 - containerRect.top
+                };
+            };
+
+            const drawLine = (startEl, endEl, lineId) => {
+                const start = getCoords(startEl);
+                const end = getCoords(endEl);
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', start.x);
+                line.setAttribute('y1', start.y);
+                line.setAttribute('x2', end.x);
+                line.setAttribute('y2', end.y);
+                
+                line.setAttribute('class', 'tree-line');
+                line.id = lineId;
+                
+                // Check if this line goes to the dead-end '0' node
+                if (endEl.classList.contains('dead-end')) {
+                    line.classList.add('dead-end-line');
+                }
+                
+                svg.appendChild(line);
+            };
+
+            // Draw lines from Root (Level 0) to all Level 1 nodes (FIXED)
+            level1Nodes.forEach((node, i) => {
+                // We now draw the line unconditionally
+                drawLine(rootNode, node, `line-l0-to-l1-i${i}`);
+            });
+
+            // Draw lines from Level 1 to Level 2 (Only for branches with leaves)
+            let leafIndex = 0;
+            LEVEL1_OPTIONS.forEach((digit1, i1) => {
+                const parentNode = level1Nodes[i1];
+                const options2 = BRANCH_CONSTRAINTS[digit1];
+                
+                for(let i2 = 0; i2 < options2.length; i2++) {
+                    const childNode = document.getElementById(getNodeId(2, leafIndex));
+                    if (childNode) { 
+                        drawLine(parentNode, childNode, `line-l1-i${i1}-to-l2-i${leafIndex}`);
+                    }
+                    leafIndex++;
+                }
+            });
+        }
+        
+        // --- Update Functions (Minor change to '0' active state) ---
+        
+        function updateDisplay() {
+            digit1Placeholder.textContent = currentCode[0] || '?';
+            digit2Placeholder.textContent = currentCode[1] || '?';
+            digit1Placeholder.classList.toggle('filled', !!currentCode[0]);
+            digit2Placeholder.classList.toggle('filled', !!currentCode[1]);
+
+            if (currentStage === 0) {
+                statusMessage.innerHTML = `<span class="instruction">Press $\mathbf{0}$ through $\mathbf{9}$ for the first digit.</span>`;
+            } else if (currentStage === 1) {
+                const allowedOptions = BRANCH_CONSTRAINTS[currentCode[0]];
+                
+                if (allowedOptions.length === 0) {
+                    statusMessage.innerHTML = `<span class="error">Digit $\mathbf{0}$ has no valid second digit options (Second digit must be positive). Press $\mathbf{Space}$ to reset.</span>`;
+                } else {
+                    const allowedOptionsList = allowedOptions.join(', ');
+                    statusMessage.innerHTML = `<span class="instruction">Choose the second digit: $\mathbf{${allowedOptionsList}}$ (B must be a positive multiple of A).</span>`;
+                }
+            } else if (currentStage === 2) {
+                statusMessage.innerHTML = `<span class="success">Code completed: $\mathbf{${currentCode.join('')}}$. Total possible codes: $\mathbf{${TOTAL_CODES}}$. Press $\mathbf{Space}$ to reset.</span>`;
+            }
+        }
+
+        function updateTreeHighlight() {
+            document.querySelectorAll('.node').forEach(node => node.classList.remove('active', 'completed'));
+            document.querySelectorAll('.tree-line').forEach(line => line.classList.remove('active'));
+            
+            // Re-apply dead-end style to '0' node and its connecting line
+            const node0 = document.getElementById(getNodeId(1, 0));
+            const line0 = document.getElementById(`line-l0-to-l1-i${0}`);
+            if (node0) node0.classList.add('dead-end');
+            if (line0) line0.classList.add('dead-end-line');
+
+
+            if (currentStage === 0) {
+                document.getElementById('root').classList.add('active');
+                return;
+            }
+            
+            const digit1 = currentCode[0];
+            const i1 = LEVEL1_OPTIONS.indexOf(digit1);
+            
+            const rootNode = document.getElementById('root');
+            const node1 = document.getElementById(getNodeId(1, i1));
+            const line01 = document.getElementById(`line-l0-to-l1-i${i1}`);
+            
+            if (rootNode) rootNode.classList.add('completed');
+            
+            if (digit1 === '0') {
+                 // When '0' is chosen, highlight it as active, but keep dead-end styling
+                 if (node1) node1.classList.add('active');
+                 if (line01) line01.classList.add('active'); // Highlight the dead-end path when selected
+                 return; 
+            }
+            
+            if (line01) line01.classList.add('active');
+            
+            if (currentStage === 1) {
+                if (node1) node1.classList.add('active');
+            } else if (currentStage === 2) {
+                if (node1) node1.classList.add('completed');
+
+                const digit2 = currentCode[1];
+                
+                const options2 = BRANCH_CONSTRAINTS[digit1];
+                const i2 = options2.indexOf(digit2);
+                
+                let leafIndex = 0;
+                for (let i = 0; i < i1; i++) {
+                    leafIndex += BRANCH_CONSTRAINTS[LEVEL1_OPTIONS[i]].length;
+                }
+                leafIndex += i2;
+
+                const leafNode = document.getElementById(getNodeId(2, leafIndex));
+                const line12 = document.getElementById(`line-l1-i${i1}-to-l2-i${leafIndex}`);
+                
+                if (line12) line12.classList.add('active');
+                
+                if (leafNode) {
+                    leafNode.classList.add('active');
+                }
+            }
+        }
+
+        // --- Game Logic (Unchanged) ---
+        function handleInput(key) {
+            key = key.toUpperCase();
+            
+            if (currentStage === 2) {
+                if (key === ' ') {
+                    resetGame();
+                }
+                return;
+            }
+            
+            if (currentStage === 1 && currentCode[0] === '0') {
+                 if (key === ' ') {
+                    resetGame();
+                 } else if (key.match(/[0-9]/)) {
+                    updateDisplay(); 
+                 }
+                 return;
+            }
+
+            let validMove = false;
+            
+            if (currentStage === 0) {
+                if (LEVEL1_OPTIONS.includes(key)) {
+                    currentCode.push(key);
+                    const i1 = LEVEL1_OPTIONS.indexOf(key);
+                    activeNodeId = getNodeId(1, i1);
+                    currentStage = 1;
+                    validMove = true;
+                }
+            } else if (currentStage === 1) {
+                const allowedOptions = BRANCH_CONSTRAINTS[currentCode[0]];
+                
+                if (allowedOptions.includes(key)) {
+                    currentCode.push(key);
+                    currentStage = 2;
+                    validMove = true;
+                }
+            }
+
+            if (validMove) {
+                updateDisplay();
+                updateTreeHighlight();
+            } else if (key.match(/[0-9]/)) {
+                if (currentStage === 0) {
+                    statusMessage.innerHTML = `<span class="error">Invalid input: $\mathbf{${key}}$. Please choose any digit $\mathbf{0}$ through $\mathbf{9}$.</span>`;
+                } else if (currentStage === 1) {
+                    const allowedOptionsList = BRANCH_CONSTRAINTS[currentCode[0]].join(', ');
+                    statusMessage.innerHTML = `<span class="error">Invalid input: $\mathbf{${key}}$. Second digit must be a positive multiple of the first ($\mathbf{${currentCode[0]}}$). Allowed options: $\mathbf{${allowedOptionsList}}$.</span>`;
+                }
+            }
+        }
+
+        function resetGame() {
+            currentStage = 0;
+            currentCode = [];
+            activeNodeId = 'root';
+            
+            updateDisplay();
+            generateTree(); 
+            updateTreeHighlight();
+        }
+
+        // --- Event Listener & Initialization (Unchanged) ---
+        document.addEventListener('keydown', (event) => {
+            if (event.key.length === 1 && event.key.match(/[0-9]/) || event.key === ' ') {
+                handleInput(event.key);
+            }
+        });
+
+        window.onload = () => {
+            generateTree();
+            resetGame();
+        };
+
+        window.addEventListener('resize', () => {
+            generateTree(); 
+        });
+
+    </script>
+</body>
+</html>

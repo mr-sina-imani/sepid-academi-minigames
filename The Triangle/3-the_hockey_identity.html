@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Hockey Stick Proof</title>
+    <style>
+        :root {
+            --cell-size: 60px;
+            --label-size: 60px;
+            --gap: 10px;
+            --active: #f1c40f; 
+            --handle: #2ecc71;   /* Green handle */
+            --blade: #3498db;    /* Blue blade (the sum) */
+            --bg: #ecf0f1;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: var(--bg);
+            padding: 40px;
+        }
+
+        .equation {
+            font-size: 1.4rem;
+            margin-bottom: 25px;
+            color: #2c3e50;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        #grid-container {
+            display: grid;
+            grid-template-columns: var(--label-size) repeat(7, var(--cell-size));
+            gap: var(--gap);
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border: 1px solid #dcdde1;
+            background-color: #f8f9fa;
+            color: #bdc3c7;
+            transition: all 0.3s ease;
+        }
+
+        .label { border: none; color: #7f8c8d; font-style: italic; background: transparent; }
+        .label-n { justify-content: flex-end; padding-right: 15px; }
+        .hidden { visibility: hidden; }
+
+        .filled { color: #2c3e50; }
+
+        /* The Original Sum Cell (The Blade) */
+        .blade-node {
+            border: 4px solid var(--blade) !important;
+            color: var(--blade) !important;
+            background-color: white !important;
+            z-index: 10;
+        }
+
+        /* The Parts of the Sum (The Handle) */
+        .handle-node {
+            background-color: var(--handle) !important;
+            color: white !important;
+            border-color: #27ae60;
+        }
+
+        /* The Current Cell being expanded */
+        .active-node {
+            background-color: var(--active) !important;
+            color: #2c3e50 !important;
+            cursor: pointer;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0px rgba(241,196,15,0); }
+            50% { transform: scale(1.05); box-shadow: 0 0 15px rgba(241,196,15,0.5); }
+            100% { transform: scale(1); box-shadow: 0 0 0px rgba(241,196,15,0); }
+        }
+
+        button { margin-top: 30px; padding: 10px 20px; cursor: pointer; border-radius: 5px; border: none; background: #2c3e50; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="equation" id="eq">Target: C(6, 3) = 20</div>
+
+    <div id="grid-container"></div>
+
+    <button onclick="location.reload()">Reset Visual Proof</button>
+
+    <script>
+        const maxN = 7; 
+        const container = document.getElementById('grid-container');
+        let activeN = 6, activeR = 3;
+
+        function getVal(n, r) {
+            if (r < 0 || r > n) return 0;
+            if (r === 0 || r === n) return 1;
+            return getVal(n-1, r-1) + getVal(n-1, r);
+        }
+
+        // Initialize grid
+        container.innerHTML = '<div class="hidden"></div>';
+        for(let r=0; r<maxN; r++) container.innerHTML += `<div class="cell label">r=${r}</div>`;
+        
+        for(let n=0; n<maxN; n++) {
+            container.innerHTML += `<div class="cell label label-n">n=${n}</div>`;
+            for(let r=0; r<maxN; r++) {
+                const isHidden = r > n;
+                container.innerHTML += `<div id="c-${n}-${r}" class="cell ${isHidden ? 'hidden' : 'filled'}">${isHidden ? '' : getVal(n, r)}</div>`;
+            }
+        }
+
+        const bladeCell = document.getElementById('c-6-3');
+        bladeCell.classList.add('blade-node', 'active-node');
+        bladeCell.onclick = expand;
+
+        function expand() {
+            const current = document.getElementById(`c-${activeN}-${activeR}`);
+            current.classList.remove('active-node');
+            current.onclick = null;
+
+            // Handle logic
+            const leftN = activeN - 1, leftR = activeR - 1;
+            const topN = activeN - 1, topR = activeR;
+
+            // Mark left parent as part of the handle
+            document.getElementById(`c-${leftN}-${leftR}`).classList.add('handle-node');
+
+            if (activeN === 3 && activeR === 3) {
+                document.getElementById('eq').innerHTML = "<b>Identity Proved!</b> Green sum = Blue value";
+                return;
+            }
+
+            // Move active state to top parent
+            activeN = topN; activeR = topR;
+            const next = document.getElementById(`c-${activeN}-${activeR}`);
+            next.classList.add('active-node');
+            next.onclick = expand;
+            
+            updateEq();
+        }
+
+        function updateEq() {
+            let str = "C(6,3) = ";
+            for(let i=5; i >= activeN; i--) str += `C(${i}, 2) + `;
+            str += `C(${activeN}, ${activeR})`;
+            document.getElementById('eq').innerHTML = str;
+        }
+    </script>
+</body>
+</html>

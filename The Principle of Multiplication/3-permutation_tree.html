@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permutations Minigame (Animated Transition)</title>
+    <style>
+        /* --- General Styling --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f4f7f9;
+        }
+
+        .container {
+            width: 95%;
+            max-width: 900px;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden; /* Important for masking the sliding animation */
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        /* --- Tree Diagram Container --- */
+        #tree-viewport {
+            width: 100%;
+            height: 450px;
+            position: relative;
+            background-color: #fafafa;
+            border: 1px dashed #ccc;
+            border-radius: 5px;
+            overflow: hidden; /* Clips the sliding content */
+        }
+
+        /* The layer we actually move/animate */
+        #movable-layer {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
+            /* Transition is applied via JS when needed */
+        }
+
+        /* --- Nodes --- */
+        .node {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            line-height: 50px;
+            text-align: center;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 1.2em;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+            transition: background-color 0.5s ease, border-color 0.5s ease, opacity 0.5s ease, transform 0.3s;
+            z-index: 10;
+            cursor: default;
+        }
+
+        /* State Styles */
+        .node.root-node {
+            background-color: #a0c4ff;
+            color: #333;
+            border: 3px solid #6c757d;
+        }
+
+        .node.child-node {
+            background-color: #ffb5a7; 
+            border: 3px solid #e05d5d;
+            cursor: pointer;
+        }
+        
+        .node.child-node:hover {
+            transform: scale(1.1);
+        }
+
+        .node.grandchild-node {
+            /* Initially hidden or small, appearing during transition */
+            background-color: #ffb5a7;
+            border: 3px solid #e05d5d;
+            opacity: 0; 
+            transform: scale(0.5);
+            animation: popIn 0.5s forwards;
+        }
+        
+        .node.inactive {
+            background-color: #e9ecef !important;
+            border-color: #adb5bd !important;
+            color: #adb5bd !important;
+        }
+
+        .node.faded {
+            opacity: 0.2;
+        }
+
+        .node.selected-child {
+            /* Turns into the style of a root node */
+            background-color: #a0c4ff !important;
+            border-color: #6c757d !important;
+            color: #333 !important;
+        }
+
+        @keyframes popIn {
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* --- SVG Lines --- */
+        svg {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            overflow: visible;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .tree-line {
+            stroke: #6c757d;
+            stroke-width: 2;
+            transition: opacity 0.5s;
+        }
+
+        /* --- Full Tree View --- */
+        .full-tree-text {
+            font-size: 8px;
+            fill: #333;
+            text-anchor: middle;
+            font-weight: bold;
+        }
+        
+        .path-text { fill: #dc3545; font-size: 10px; }
+        .full-tree-line { stroke: #333; stroke-width: 0.5; }
+        .full-tree-line.path { stroke: #dc3545; stroke-width: 2; }
+
+        /* --- Status & Inputs --- */
+        #code-placeholder-container {
+            text-align: center;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        .digit-placeholder {
+            display: inline-block;
+            width: 40px;
+            height: 60px;
+            line-height: 60px;
+            font-size: 2em;
+            font-weight: bold;
+            text-align: center;
+            margin: 0 5px;
+            border-bottom: 3px solid #495057;
+            background-color: white;
+            color: #495057;
+            transition: all 0.3s ease;
+        }
+
+        .digit-placeholder.filled {
+            background-color: #d1e7dd;
+            color: #0f5132;
+        }
+
+        #status-message {
+            margin-top: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-align: center;
+            color: #333;
+        }
+        
+        .instruction { color: #007bff; }
+        .success { color: #198754; }
+        .error { color: #dc3545; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🔄 Permutations Minigame (Animated)</h2>
+        <p>Enter a 4-digit code using $\mathbf{1}$ to $\mathbf{4}$ exactly once.</p>
+        
+        <div id="tree-viewport">
+            <div id="movable-layer">
+                </div>
+        </div>
+
+        <div id="code-placeholder-container">
+            <div id="digit-0" class="digit-placeholder">?</div>
+            <div id="digit-1" class="digit-placeholder">?</div>
+            <div id="digit-2" class="digit-placeholder">?</div>
+            <div id="digit-3" class="digit-placeholder">?</div>
+        </div>
+
+        <div id="status-message">
+            <span class="instruction">Select an option to start.</span>
+        </div>
+    </div>
+    
+    <script>
+        const PERMUTATION_SET = ['1', '2', '3', '4'];
+        const N = PERMUTATION_SET.length;
+        const TOTAL_PERMUTATIONS = 24;
+
+        let currentPath = []; 
+        let currentStage = 0;
+        let isAnimating = false; // Lock input during animation
+
+        const viewport = document.getElementById('tree-viewport');
+        const movableLayer = document.getElementById('movable-layer');
+        const statusMessage = document.getElementById('status-message');
+        const placeholders = Array.from({ length: N }, (_, i) => document.getElementById(`digit-${i}`));
+        
+        // --- Constants for Geometry ---
+        const VIEW_WIDTH = viewport.clientWidth;
+        const VIEW_HEIGHT = viewport.clientHeight; // 450px
+        const ROOT_Y = 50;   // Top-center position Y
+        const CHILD_Y = 200; // Child row Y
+        const GRAND_Y = 350; // Grandchild row Y
+
+        // --- Helper: Get Available Digits ---
+        function getAvailableOptions(path) {
+            const used = new Set(path);
+            return PERMUTATION_SET.filter(digit => !used.has(digit));
+        }
+
+        // --- Helper: Create a Node Element ---
+        function createNode(text, x, y, type) {
+            const node = document.createElement('div');
+            node.classList.add('node', type);
+            node.textContent = text;
+            node.style.left = (x - 25) + 'px'; // Center horizontally (width 50)
+            node.style.top = (y - 25) + 'px';  // Center vertically (height 50)
+            node.dataset.value = text;
+            return node;
+        }
+
+        // --- Helper: Draw SVG Line ---
+        function createLine(x1, y1, x2, y2, svgContext) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('class', 'tree-line');
+            svgContext.appendChild(line);
+            return line;
+        }
+
+        // --- 1. Initial Render (Zoomed View) ---
+        function renderScene() {
+            movableLayer.innerHTML = '';
+            movableLayer.style.transition = 'none';
+            movableLayer.style.transform = 'translate(0, 0)';
+            
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            movableLayer.appendChild(svg);
+
+            const options = getAvailableOptions(currentPath);
+            const currentCodeStr = currentPath.length > 0 ? currentPath.join('') : 'START';
+
+            // 1. Draw Current Node (Root of this view)
+            const rootX = VIEW_WIDTH / 2;
+            const rootNode = createNode(currentCodeStr, rootX, ROOT_Y, 'root-node');
+            rootNode.id = 'current-root-node';
+            movableLayer.appendChild(rootNode);
+
+            // 2. Draw Parent Link (Visual only)
+            if (currentPath.length > 0) {
+                const parentText = document.createElement('div');
+                parentText.style.position = 'absolute';
+                parentText.style.top = '10px';
+                parentText.style.width = '100%';
+                parentText.style.textAlign = 'center';
+                parentText.style.color = '#888';
+                parentText.innerHTML = '&#9650;'; 
+                movableLayer.appendChild(parentText);
+            }
+
+            // 3. Draw Children
+            if (options.length === 0) return; // Leaf reached
+
+            const gap = VIEW_WIDTH / (options.length + 1);
+            
+            options.forEach((digit, index) => {
+                const childX = gap * (index + 1);
+                
+                // Line
+                createLine(rootX, ROOT_Y + 25, childX, CHILD_Y - 25, svg);
+                
+                // Node
+                const childNode = createNode(digit, childX, CHILD_Y, 'child-node');
+                
+                // Event Listener
+                childNode.onclick = () => {
+                    if (!isAnimating) handleTransition(digit, childX, CHILD_Y, childNode);
+                };
+                
+                movableLayer.appendChild(childNode);
+            });
+        }
+
+        // --- 2. The Animated Transition ---
+        function handleTransition(selectedDigit, startX, startY, selectedNodeElem) {
+            isAnimating = true;
+
+            // Update placeholder immediately for responsiveness
+            const nextPath = [...currentPath, selectedDigit];
+            placeholders[currentStage].textContent = selectedDigit;
+            placeholders[currentStage].classList.add('filled');
+            
+            const svg = movableLayer.querySelector('svg');
+            
+            // Step 1: "Expand" - Generate Grandchildren
+            const grandOptions = getAvailableOptions(nextPath);
+            
+            if (grandOptions.length > 0) {
+                // Calculate positions for grandchildren relative to the selected child
+                // We want them centered under the selected child
+                const grandWidth = VIEW_WIDTH * 0.6; // Use 60% of width for next subtree
+                const grandGap = grandWidth / (grandOptions.length + 1);
+                const startGrandX = startX - (grandWidth / 2);
+
+                grandOptions.forEach((grandDigit, i) => {
+                    const grandX = startGrandX + (grandGap * (i + 1));
+                    
+                    // Draw Line (fade in)
+                    const line = createLine(startX, startY + 25, grandX, GRAND_Y - 25, svg);
+                    line.style.opacity = '0';
+                    line.animate([{opacity: 0}, {opacity: 1}], {duration: 500, fill: 'forwards'});
+
+                    // Draw Node (pop in)
+                    const grandNode = createNode(grandDigit, grandX, GRAND_Y, 'grandchild-node');
+                    movableLayer.appendChild(grandNode);
+                });
+            }
+
+            // Step 2: Color Changes ("Deactivate" Parent, "Activate" Child)
+            const currentRoot = document.getElementById('current-root-node');
+            if (currentRoot) currentRoot.classList.add('inactive');
+            
+            // Fade out siblings
+            document.querySelectorAll('.child-node').forEach(node => {
+                if (node !== selectedNodeElem) node.classList.add('faded');
+            });
+
+            selectedNodeElem.classList.remove('child-node'); // Remove pointer cursor
+            selectedNodeElem.classList.add('selected-child'); // Turn blue
+
+            // Step 3: Move the Observation Frame
+            // We want 'selectedNodeElem' (currently at startX, startY) to move to (VIEW_WIDTH/2, ROOT_Y)
+            const deltaX = (VIEW_WIDTH / 2) - startX;
+            const deltaY = ROOT_Y - startY; // e.g., 50 - 200 = -150px
+
+            // Apply smooth transform to the layer
+            movableLayer.style.transition = 'transform 1.2s cubic-bezier(0.25, 1, 0.5, 1)'; // Elegant ease
+            movableLayer.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+
+            // Wait for transition to end, then Reset
+            setTimeout(() => {
+                currentPath.push(selectedDigit);
+                currentStage++;
+                
+                // Logic: Check if we are done or need next render
+                if (currentStage === N) {
+                    showFinalZoomOut();
+                } else {
+                    renderScene(); // Reset DOM, place selected node at top as new root
+                    isAnimating = false;
+                    updateStatus();
+                }
+            }, 1200); // slightly longer than transition to ensure smoothness
+        }
+
+        // --- 3. Zoom Out / Final View (Unchanged Logic, updated rendering) ---
+        function showFinalZoomOut() {
+            isAnimating = false;
+            statusMessage.innerHTML = `<span class="success">Permutation Complete! $\mathbf{${currentPath.join('')}}$. Zooming out...</span>`;
+
+            setTimeout(() => {
+                drawFullTreePath(currentPath);
+            }, 500);
+        }
+
+        function drawFullTreePath(path) {
+            movableLayer.innerHTML = '';
+            movableLayer.style.transition = 'none';
+            movableLayer.style.transform = 'translate(0, 0)';
+
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            movableLayer.appendChild(svg);
+            
+            // Reuse logic from previous answer for symmetric tree
+            const HEIGHT = 450; 
+            const WIDTH = viewport.clientWidth;
+            const Y_STEP = HEIGHT / (N + 1);
+
+            function getSymmetricCoordinates(pathSegment) {
+                const level = pathSegment.length;
+                const y = Y_STEP * level + 30; // offset
+                if (level === 0) return { x: WIDTH / 2, y };
+
+                let globalIndex = 0;
+                let digitsAvailable = [...PERMUTATION_SET];
+                let currentDivisor = TOTAL_PERMUTATIONS;
+                
+                for(let i = 0; i < level; i++) {
+                    const digit = pathSegment[i];
+                    const index = digitsAvailable.indexOf(digit);
+                    currentDivisor = currentDivisor / (N - i); 
+                    globalIndex += index * currentDivisor;
+                    digitsAvailable.splice(index, 1);
+                }
+                const x = (globalIndex + 0.5) * (WIDTH / TOTAL_PERMUTATIONS);
+                return { x, y };
+            }
+
+            const isPathPrefix = (segment) => path.join('').startsWith(segment.join(''));
+
+            function traverseAndDraw(level, currentPathSegment) {
+                const options = getAvailableOptions(currentPathSegment);
+                const isCurrentPath = isPathPrefix(currentPathSegment);
+                const { x: x1, y: y1 } = getSymmetricCoordinates(currentPathSegment);
+                
+                const nodeText = currentPathSegment.join('') || 'R';
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', x1);
+                text.setAttribute('y', y1 - 5);
+                text.setAttribute('class', `full-tree-text ${isCurrentPath ? 'path-text' : ''}`);
+                text.textContent = nodeText;
+                svg.appendChild(text);
+
+                options.forEach((digit) => {
+                    if (level < N) {
+                        const nextPathSegment = [...currentPathSegment, digit];
+                        const { x: x2, y: y2 } = getSymmetricCoordinates(nextPathSegment);
+                        const isEdgePath = isCurrentPath && path[level] === digit;
+                        
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', x1);
+                        line.setAttribute('y1', y1);
+                        line.setAttribute('x2', x2);
+                        line.setAttribute('y2', y2);
+                        line.setAttribute('class', `full-tree-line ${isEdgePath ? 'path' : ''}`);
+                        svg.appendChild(line);
+                        
+                        traverseAndDraw(level + 1, nextPathSegment);
+                    }
+                });
+            }
+            traverseAndDraw(0, []);
+        }
+
+        // --- Logic & Events ---
+        function updateStatus() {
+            const options = getAvailableOptions(currentPath).join(', ');
+            statusMessage.innerHTML = `<span class="instruction">Choose next digit: $\mathbf{${options}}$</span>`;
+        }
+
+        function resetGame() {
+            currentStage = 0;
+            currentPath = [];
+            isAnimating = false;
+            placeholders.forEach(p => {
+                p.textContent = '?';
+                p.classList.remove('filled');
+            });
+            updateStatus();
+            renderScene();
+        }
+
+        // Keyboard Support (Simulates Click)
+        document.addEventListener('keydown', (event) => {
+            if (isAnimating) return;
+            
+            if (currentStage < N && event.key.match(/[1-4]/)) {
+                // Find the node corresponding to this key
+                const nodes = document.querySelectorAll('.child-node');
+                nodes.forEach(node => {
+                    if (node.dataset.value === event.key) {
+                        // We need the calculated layout coordinates from the DOM
+                        const rect = node.getBoundingClientRect();
+                        const containerRect = movableLayer.getBoundingClientRect();
+                        // Convert absolute DOM to relative container coordinates
+                        const x = rect.left - containerRect.left + 25; // center x
+                        const y = rect.top - containerRect.top + 25;   // center y
+                        handleTransition(event.key, x, y, node);
+                    }
+                });
+            } else if (currentStage === N && event.key === ' ') {
+                resetGame();
+            }
+        });
+        
+        window.onload = resetGame;
+        window.onresize = () => { if(!isAnimating && currentStage < N) renderScene(); };
+
+    </script>
+</body>
+</html>

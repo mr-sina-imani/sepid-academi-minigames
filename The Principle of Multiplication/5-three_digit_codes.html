@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combinatorics Minigame: Dependent Choices (Visual Exclusion)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #e8f5e9;
+            color: #333;
+        }
+
+        h1 {
+            color: #388e3c;
+            margin-bottom: 0.5em;
+        }
+
+        p.problem {
+            font-size: 1.1em;
+            max-width: 700px;
+            text-align: center;
+            margin-bottom: 2em;
+            padding: 15px;
+            border: 1px solid #c8e6c9;
+            background-color: #f0fff0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .code-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            font-size: 2em;
+        }
+
+        .digit-placeholder {
+            width: 60px;
+            height: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #ccc;
+            border-radius: 8px;
+            background-color: #fff;
+            transition: border-color 0.3s, background-color 0.3s;
+            font-weight: bold;
+        }
+
+        .digit-label {
+            font-size: 0.4em;
+            color: #6c757d;
+            position: absolute;
+            top: 5px;
+        }
+
+        .digit-wrapper {
+            position: relative;
+        }
+
+        .active {
+            border-color: #4caf50;
+            background-color: #f7fff7;
+        }
+
+        .options-container {
+            min-height: 40px;
+            margin-bottom: 20px;
+        }
+
+        .options-list {
+            font-size: 1.1em;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #ff9800;
+            color: white;
+            font-weight: bold;
+        }
+        
+        /* New Styling for Visual Exclusion */
+        .option-digits {
+            font-size: 1.8em;
+            letter-spacing: 5px;
+            padding: 10px 0;
+            background-color: white;
+            border-radius: 4px;
+            color: #333;
+            user-select: none;
+        }
+        
+        .option-digit-item {
+            display: inline-block;
+            margin: 0 5px;
+            padding: 0 2px;
+            transition: all 0.2s;
+        }
+
+        .excluded {
+            text-decoration: line-through 4px red; /* Heavy red strike-through */
+            color: #ccc !important;
+            font-weight: normal;
+        }
+
+        .message {
+            font-size: 1.1em;
+            color: #388e3c;
+            font-weight: bold;
+        }
+
+        .message.success {
+            color: #4caf50;
+        }
+
+        .message.warning {
+            color: #ff9800;
+        }
+
+        .message.error {
+            color: #dc3545;
+        }
+
+        .instruction {
+            margin-top: 1em;
+            padding: 10px;
+            background-color: #eee;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .instruction strong {
+            color: #388e3c;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Different Last Digit</h1>
+
+    <div class="code-container" id="code-container">
+        </div>
+
+    <div class="options-container">
+        <div id="options-display"></div>
+    </div>
+    <script>
+        const NUM_POSITIONS = 3;
+        const ALL_DIGITS = Array.from({ length: 10 }, (_, i) => i); // [0, 1, ..., 9]
+
+        const codeContainerEl = document.getElementById('code-container');
+        const optionsEl = document.getElementById('options-display');
+        const actionEl = document.getElementById('current-action');
+
+        let state = {
+            d1: null,
+            d2: null,
+            d3: null,
+            phase: 1, // 1: Input D1, 2: Input D2, 3: Input D3, 4: Complete
+            excludedDigits: new Set()
+        };
+
+        // --- Core Logic ---
+
+        /**
+         * Calculates and updates the set of excluded digits for D3.
+         * D3 must be different from D1 AND D2.
+         */
+        function updateExcludedDigits() {
+            state.excludedDigits.clear();
+            if (state.d1 !== null) {
+                state.excludedDigits.add(state.d1);
+            }
+            if (state.d2 !== null && state.d2 !== state.d1) {
+                state.excludedDigits.add(state.d2);
+            }
+        }
+
+        // --- UI Updates ---
+
+        function renderSlots() {
+            // ... (renderSlots function remains the same as before)
+            codeContainerEl.innerHTML = '';
+            const digits = [state.d1, state.d2, state.d3];
+            const labels = ['D1', 'D2', 'D3'];
+
+            for (let i = 0; i < NUM_POSITIONS; i++) {
+                const digitWrapper = document.createElement('div');
+                digitWrapper.className = 'digit-wrapper';
+                
+                const digitEl = document.createElement('div');
+                digitEl.className = 'digit-placeholder';
+                
+                const labelEl = document.createElement('div');
+                labelEl.className = 'digit-label';
+                labelEl.textContent = labels[i];
+                digitWrapper.appendChild(labelEl);
+
+                const digitContent = digits[i] !== null ? digits[i] : '_';
+                digitEl.textContent = digitContent;
+
+                if (state.phase === i + 1) {
+                    digitEl.classList.add('active');
+                }
+                
+                digitWrapper.appendChild(digitEl);
+                codeContainerEl.appendChild(digitWrapper);
+            }
+        }
+        
+        /**
+         * Renders the 10 possible D3 digits with exclusions marked by strike-through.
+         * @returns {string} HTML string for the options display.
+         */
+        function renderVisualOptions() {
+            let html = '<div class="option-digits">';
+            ALL_DIGITS.forEach(digit => {
+                const isExcluded = state.excludedDigits.has(digit);
+                const classList = isExcluded ? 'excluded' : '';
+                html += `<span class="option-digit-item ${classList}" data-digit="${digit}">${digit}</span>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function updateUI() {
+            renderSlots();
+            optionsEl.innerHTML = '';
+            
+            if (state.phase <= 2) {
+                actionEl.textContent = `Input D${state.phase}`;
+            } else if (state.phase === 3) {
+                // Phase 3: Display options for D3
+                updateExcludedDigits(); 
+                const numChoices = 10 - state.excludedDigits.size;
+
+                let feedbackClass = '';
+                let feedbackText = '';
+                
+                
+
+                // --- Visual Options Display ---
+                optionsEl.innerHTML = `
+                    <div class="options-list">
+                        Available Choices for D3:
+                    </div>
+                `
+                optionsEl.innerHTML += renderVisualOptions();
+            }
+        }
+
+        function resetGame() {
+            state.d1 = null;
+            state.d2 = null;
+            state.d3 = null;
+            state.phase = 1;
+            state.excludedDigits.clear();
+            updateUI();
+        }
+
+        // --- Event Listener ---
+
+        document.addEventListener('keydown', (event) => {
+            const key = event.key;
+
+            // Global reset on Spacebar
+            if (key === ' ') {
+                event.preventDefault(); 
+                resetGame();
+                return;
+            }
+
+            const digit = parseInt(key);
+            if (isNaN(digit) || digit < 0 || digit > 9) {
+                return; 
+            }
+
+            if (state.phase === 1) {
+                // Input D1
+                state.d1 = digit;
+                state.phase = 2;
+                updateUI();
+            } else if (state.phase === 2) {
+                // Input D2
+                state.d2 = digit;
+                state.phase = 3;
+                updateUI(); 
+            } else if (state.phase === 3) {
+                // Input D3 (Validation required)
+                updateExcludedDigits(); // Ensure exclusion set is current
+                
+                if (!state.excludedDigits.has(digit)) {
+                    // Valid D3 chosen
+                    state.d3 = digit;
+                    state.phase = 4;
+                    updateUI();
+                } else {
+                    // Invalid D3 chosen
+                    messageEl.classList.add('error');
+                    messageEl.textContent = `INCORRECT! ${digit} is not available for D3 because it is equal to D1 or D2. Try again or press [Spacebar].`;
+                }
+            }
+        });
+
+        // Initialize the game state when the page loads
+        resetGame();
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Path Counting Dynamic Programming</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --text-main: #1e293b;
+            --grid-line: #94a3b8;
+            --vertex-initial: #cbd5e1;
+            --vertex-editable: #fff;
+            --input-border: #64748b;
+            --success: #10b981;
+            --error: #ef4444;
+            --info: #2563eb;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h1 { margin-bottom: 0.5rem; }
+        p { color: #64748b; margin-bottom: 2rem; text-align: center; max-width: 700px; }
+
+        #game-container {
+            position: relative;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* --- SVG Grid Styling --- */
+        #grid-svg {
+            background-color: #f1f5f9;
+            position: absolute;
+	    left: 0;
+	    top: 0;
+        }
+
+        .grid-line {
+            stroke: var(--grid-line);
+            stroke-width: 2;
+        }
+        
+        /* --- Vertex Input Styling --- */
+        .vertex-group {
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 40px; /* Size of the hit area */
+            height: 40px;
+            transform: translate(-50%, -50%);
+            /* Coordinates will be set by JS */
+        }
+
+        .vertex-circle {
+            width: 35px;
+            height: 35px;
+            text-align: center;
+            background-color: var(--vertex-editable);
+            border-radius: 20px;
+            color: var(--text-main);
+            padding: 0;
+            margin: 0;
+            border: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 1rem;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .vertex-circle.initial {
+            background-color: var(--vertex-initial);
+            border-color: var(--grid-line);
+            color: var(--text-main);
+            pointer-events: none;
+            cursor: default;
+        }
+
+        .vertex-circle.correct {
+            background-color: var(--success);
+            border-color: var(--success);
+            color: white;
+        }
+
+        .vertex-circle.incorrect {
+            background-color: var(--error);
+            border-color: var(--error);
+            color: white;
+            animation: shake 0.5s;
+        }
+        
+        .vertex-circle input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            text-align: center;
+            font-size: 1rem;
+            font-weight: bold;
+            background: transparent;
+            color: var(--text-main);
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+        }
+        
+        .vertex-circle.correct input { color: white; }
+        .vertex-circle.incorrect input { color: white; }
+        
+        .label-A, .label-B {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--info);
+        }
+        .label-A { top: -20px; left: -20px; }
+        .label-B { top: -20px; right: -20px; }
+
+
+        /* --- Status Bar --- */
+        #status-bar {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            height: 40px;
+            border-radius: 6px;
+            color: var(--text-main);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Path Counting: The Recurrence Principle</h1>
+    <p>
+        The number of paths to any vertex is the sum of the paths reaching the vertex from the left (ending in R) and the paths reaching it from below (ending in U).<br>
+        Calculate the path count for each vertex. You can only enter a number if the vertices to the left and below are already filled.
+    </p>
+
+	<centre>
+    <div id="game-container">
+    <centre>
+        <svg id="grid-svg" width="400" height="300"></svg>
+        </centre>
+        </div>
+        </centre>
+
+    <script>
+        // --- Configuration ---
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        const COLS = 4; // Number of columns (x-axis vertices: 0 to 4)
+        const ROWS = 3; // Number of rows (y-axis vertices: 0 to 3)
+        const CELL_SIZE = 80; // Size of one grid cell in pixels
+        const OFFSET = 20; // Padding offset from the edge of the SVG
+
+        // --- State ---
+        // Stores the correct path count N(i, j) for vertex at column i, row j
+        const correctCounts = Array(COLS + 1).fill(0).map(() => Array(ROWS + 1).fill(0)); 
+        // Stores the user's input values
+        const userInputs = Array(COLS + 1).fill(0).map(() => Array(ROWS + 1).fill(null));
+        
+        // --- DOM Elements ---
+        const container = document.getElementById('game-container');
+        const svg = document.getElementById('grid-svg');
+        const statusBar = document.getElementById('status-bar');
+
+        // --- Initialization ---
+
+        function initGame() {
+            calculateCorrectCounts();
+            renderGrid();
+            renderVertices();
+        }
+
+        // 1. Calculate the correct answers using DP
+        function calculateCorrectCounts() {
+            // Base case: N(0, 0) = 1 (A to A is one path)
+            correctCounts[0][0] = 1;
+
+            for (let i = 0; i <= COLS; i++) {
+                for (let j = 0; j <= ROWS; j++) {
+                    if (i === 0 && j === 0) continue;
+
+                    let count = 0;
+                    
+                    // Path from Left (R)
+                    if (i > 0) {
+                        count += correctCounts[i - 1][j];
+                    }
+                    
+                    // Path from Bottom (U)
+                    if (j > 0) {
+                        count += correctCounts[i][j - 1];
+                    }
+                    
+                    correctCounts[i][j] = count;
+                }
+            }
+        }
+
+        // 2. Render the grid lines
+        function renderGrid() {
+            const width = COLS * CELL_SIZE + 2 * OFFSET;
+            const height = ROWS * CELL_SIZE + 2 * OFFSET;
+            svg.setAttribute('width', width);
+            svg.setAttribute('height', height);
+
+            // Horizontal Lines
+            for (let j = 0; j <= ROWS; j++) {
+                const y = OFFSET + j * CELL_SIZE;
+                const line = document.createElementNS(SVG_NS, 'line');
+                line.setAttribute('x1', OFFSET);
+                line.setAttribute('y1', y);
+                line.setAttribute('x2', width - OFFSET);
+                line.setAttribute('y2', y);
+                line.classList.add('grid-line');
+                svg.appendChild(line);
+            }
+
+            // Vertical Lines
+            for (let i = 0; i <= COLS; i++) {
+                const x = OFFSET + i * CELL_SIZE;
+                const line = document.createElementNS(SVG_NS, 'line');
+                line.setAttribute('x1', x);
+                line.setAttribute('y1', OFFSET);
+                line.setAttribute('x2', x);
+                line.setAttribute('y2', height - OFFSET);
+                line.classList.add('grid-line');
+                svg.appendChild(line);
+            }
+        }
+
+        // 3. Render the interactive vertex circles
+        function renderVertices() {
+            for (let i = 0; i <= COLS; i++) {
+                for (let j = 0; j <= ROWS; j++) {
+                    const x = OFFSET + i * CELL_SIZE;
+                    const y = OFFSET + (ROWS - j) * CELL_SIZE; // Invert Y for screen coords
+
+                    const group = document.createElement('div');
+                    group.classList.add('vertex-group');
+                    group.style.left = `${x}px`;
+                    group.style.top = `${y}px`;
+                    group.dataset.col = i;
+                    group.dataset.row = j;
+                    
+                    const circle = document.createElement('div');
+                    circle.classList.add('vertex-circle');
+
+                    if (i === 0 || j === 0) {
+                        // Initial state (left/bottom edges)
+                        circle.classList.add('initial');
+                        circle.textContent = '1';
+                        userInputs[i][j] = 1;
+                        if (i !== 0 || j !== 0) { // All except (0,0) must have correct class too
+                            circle.classList.add('correct');
+                        }
+                    } else {
+                        // Editable inputs
+                        const input = document.createElement('input');
+                        input.type = 'number';
+                        input.min = 0;
+                        input.maxLength = 5;
+                        input.id = `input-${i}-${j}`;
+                        input.dataset.col = i;
+                        input.dataset.row = j;
+                        input.disabled = true; // Initially disabled
+                        
+                        input.addEventListener('focus', handleFocus);
+                        input.addEventListener("keyup", e => {
+    if (e.key === "Enter") validateInput(input);
+});
+input.addEventListener("blur", () => validateInput(input));
+
+                        circle.appendChild(input);
+                    }
+                    
+                    group.appendChild(circle);
+                    container.appendChild(group);
+
+                   
+                }
+            }
+            updateInputStates(); // Initial check to enable first set of inputs
+        }
+
+        // --- Game Logic ---
+
+        function updateInputStates() {
+            let enabledCount = 0;
+            let solvedCount = 0;
+
+            for (let i = 1; i <= COLS; i++) {
+                for (let j = 1; j <= ROWS; j++) {
+                    const inputEl = document.getElementById(`input-${i}-${j}`);
+                    if (!inputEl) continue;
+
+                    const isSolved = inputEl.parentElement.classList.contains('correct');
+                    if (isSolved) {
+                        inputEl.disabled = true;
+                        solvedCount++;
+                        continue;
+                    }
+
+                    // Check dependencies: left (i-1, j) and bottom (i, j-1)
+                    const leftSolved = userInputs[i - 1][j] !== null;
+                    const bottomSolved = userInputs[i][j - 1] !== null;
+
+                    if (leftSolved && bottomSolved) {
+                        inputEl.disabled = false;
+                        inputEl.style.color = 'var(--text-main)'; // Reset color if previously wrong
+                        enabledCount++;
+                    } else {
+                        inputEl.disabled = true;
+                    }
+                }
+            }
+            
+            if (solvedCount === COLS * ROWS) {
+                endGame();
+            } else if (enabledCount > 0) {
+                statusBar.textContent = `You have ${enabledCount} available squares to calculate. Sum the left and bottom values!`;
+            } else {
+                 statusBar.textContent = "Click the first editable circle to begin.";
+            }
+        }
+
+        function handleFocus(event) {
+             const input = event.target;
+             const circle = input.parentElement;
+             circle.classList.remove('incorrect');
+             circle.style.animation = 'none'; // Stop shake animation on focus
+        }
+	function validateInput(input) {
+	    const i = parseInt(input.dataset.col);
+	    const j = parseInt(input.dataset.row);
+	    const circle = input.parentElement;
+	    const value = parseInt(input.value.trim());
+
+	    circle.classList.remove('correct', 'incorrect');
+	    input.style.color = 'var(--text-main)';
+
+	    if (isNaN(value)) {
+		userInputs[i][j] = null;
+		return;
+	    }
+
+	    if (value === correctCounts[i][j]) {
+		circle.classList.add('correct');
+		userInputs[i][j] = value;
+		input.disabled = true;
+		updateInputStates();
+	    } else {
+		circle.classList.add('incorrect');
+		userInputs[i][j] = null;
+	    }
+	}
+
+
+        function setStatus(text, type) {
+            statusBar.textContent = text;
+            statusBar.style.color = type === 'error' ? 'var(--error)' : 
+                                     type === 'success' ? 'var(--success)' : 
+                                     'var(--text-main)';
+        }
+
+        function endGame() {
+            setStatus(`GAME COMPLETE! The total number of paths from A to B (${COLS}x${ROWS}) is ${correctCounts[COLS][ROWS]}.`, 'success');
+            // Disable all remaining inputs just in case
+            document.querySelectorAll('input').forEach(input => input.disabled = true);
+        }
+
+        // Start
+        initGame();
+    </script>
+</body>
+</html>

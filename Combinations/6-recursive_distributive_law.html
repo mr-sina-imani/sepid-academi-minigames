@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nested Distribution Minigame</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            font-family: 'Segoe UI', sans-serif;
+            cursor: pointer;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        .expression-container {
+            font-size: 2.2rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            max-width: 90%;
+            line-height: 2;
+        }
+
+        /* Base Color Classes */
+        .red { background-color: #ffcccc; padding: 2px 8px; border-radius: 4px; transition: background-color 0.4s; }
+        .blue { background-color: #cce5ff; padding: 2px 8px; border-radius: 4px; transition: background-color 0.4s; }
+        .black { background-color: #eeeeee; padding: 2px 8px; border-radius: 4px; transition: background-color 0.4s; }
+        .none { background-color: transparent; padding: 2px 2px; }
+
+        .hidden { display: none !important; }
+        
+        #step2, #step3 {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s ease;
+        }
+
+        .visible {
+            opacity: 1 !important;
+            transform: translateY(0) !important;
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 30px;
+            color: #aaa;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body onclick="nextStep()">
+
+    <div class="expression-container">
+        <div id="step1">
+            <span>(</span>
+            <span id="p1-a" class="red">2x</span>
+            <span>+</span>
+            <span id="p1-b" class="blue">3</span>
+            <span>)</span>
+            <span>&middot;</span>
+            <span id="p1-c" class="black">(x + 1)</span>
+        </div>
+
+        <div id="step2" class="hidden">
+            <span>=</span>
+            <span id="p2-a" class="red">2x</span>
+            <span>&middot;</span>
+            <span id="p2-c1" class="black">(x + 1)</span>
+            <span>+</span>
+            <span id="p2-b" class="blue">3</span>
+            <span>&middot;</span>
+            <span id="p2-c2" class="black">(x + 1)</span>
+        </div>
+
+        <div id="step3" class="hidden">
+            <span>=</span>
+            <span class="black">2x</span><span>&middot;</span><span class="red">x</span>
+            <span>+</span>
+            <span class="black">2x</span><span>&middot;</span><span class="blue">1</span>
+            <span>+</span>
+            <span class="black">3</span><span>&middot;</span><span class="red">x</span>
+            <span>+</span>
+            <span class="black">3</span><span>&middot;</span><span class="blue">1</span>
+        </div>
+    </div>
+
+    <div id="hint" class="hint">Click to expand</div>
+
+    <script>
+        let currentPhase = 1;
+
+        function nextStep() {
+            const s2 = document.getElementById('step2');
+            const s3 = document.getElementById('step3');
+            const hint = document.getElementById('hint');
+
+            if (currentPhase === 1) {
+                // Show Phase 2 with initial colors
+                s2.classList.remove('hidden');
+                setTimeout(() => s2.classList.add('visible'), 10);
+                hint.innerText = "Click to re-focus variables";
+                currentPhase = 2;
+            } 
+            else if (currentPhase === 2) {
+                // Change colors in Phase 2
+                // 2x and 3 become black
+                document.getElementById('p2-a').className = "black";
+                document.getElementById('p2-b').className = "black";
+                
+                // (x + 1) becomes split colors (visualized by updating innerHTML)
+                const c1 = document.getElementById('p2-c1');
+                const c2 = document.getElementById('p2-c2');
+                
+                const splitHTML = `(<span class="red">x</span> + <span class="blue">1</span>)`;
+                c1.innerHTML = splitHTML;
+                c2.innerHTML = splitHTML;
+                c1.className = "none";
+                c2.className = "none";
+
+                hint.innerText = "Click to distribute fully";
+                currentPhase = 3;
+            } 
+            else if (currentPhase === 3) {
+                // Show Phase 3
+                s3.classList.remove('hidden');
+                setTimeout(() => s3.classList.add('visible'), 10);
+                hint.style.display = "none";
+                currentPhase = 4;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pascal Matrix: Coordinates</title>
+    <style>
+        :root {
+            --cell-size: 60px;
+            --label-size: 80px;
+            --gap: 10px;
+            --primary: #34495e;
+            --success: #27ae60;
+            --error: #e74c3c;
+            --label-color: #7f8c8d;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f8f9fa;
+            padding: 40px;
+        }
+
+        h1 { color: #2c3e50; margin-bottom: 30px; }
+
+        /* Grid container: 7 columns (1 for labels + 6 for data) */
+        #grid-container {
+            display: grid;
+            grid-template-columns: var(--label-size) repeat(6, var(--cell-size));
+            gap: var(--gap);
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            align-items: center;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border: 1px solid #dcdde1;
+            box-sizing: border-box;
+        }
+
+        /* Label styling */
+        .label {
+            font-size: 0.9rem;
+            color: var(--label-color);
+            font-style: italic;
+            border: none;
+            justify-content: flex-end;
+            padding-right: 15px;
+        }
+
+        .label-r {
+            justify-content: center;
+            padding-right: 0;
+            height: 30px;
+            border: none;
+        }
+
+        .filled { background-color: var(--primary); color: white; border: none; }
+        
+        input.target {
+            text-align: center;
+            outline: none;
+            border: 2px solid #bdc3c7;
+            background-color: #fafafa;
+        }
+
+        /* Remove arrows from number inputs */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+
+        .correct { background-color: var(--success) !important; color: white; border-color: var(--success) !important; }
+        .wrong { background-color: var(--error) !important; color: white; border-color: var(--error) !important; }
+        .hidden { visibility: hidden; border: none; }
+
+        .corner-empty { border: none; visibility: hidden; }
+    </style>
+</head>
+<body>
+
+    <h1>Combinatorics Workshop: C(n, r)</h1>
+
+    <div id="grid-container">
+        <div class="corner-empty"></div>
+        
+        <div class="cell label-r">r = 0</div>
+        <div class="cell label-r">r = 1</div>
+        <div class="cell label-r">r = 2</div>
+        <div class="cell label-r">r = 3</div>
+        <div class="cell label-r">r = 4</div>
+        <div class="cell label-r">r = 5</div>
+
+        </div>
+
+    <script>
+        const totalRows = 6;
+        const container = document.getElementById('grid-container');
+
+        function getPascalValue(n, r) {
+            if (r < 0 || r > n) return 0;
+            if (r === 0 || r === n) return 1;
+            return getPascalValue(n - 1, r - 1) + getPascalValue(n - 1, r);
+        }
+
+        for (let n = 0; n < totalRows; n++) {
+            // 1. Add the Row Label (n = ...)
+            const nLabel = document.createElement('div');
+            nLabel.className = 'cell label';
+            nLabel.textContent = `n = ${n}`;
+            container.appendChild(nLabel);
+
+            // 2. Add the cells for this row
+            for (let r = 0; r < totalRows; r++) {
+                if (r > n) {
+                    const empty = document.createElement('div');
+                    empty.className = 'cell hidden';
+                    container.appendChild(empty);
+                } else if (n < 5) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell filled';
+                    cell.textContent = getPascalValue(n, r);
+                    container.appendChild(cell);
+                } else {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.className = 'cell target';
+                    input.dataset.correct = getPascalValue(n, r);
+                    input.addEventListener('input', function() {
+                        if (this.value === "") this.className = 'cell target';
+                        else if (parseInt(this.value) === parseInt(this.dataset.correct)) this.className = 'cell target correct';
+                        else this.className = 'cell target wrong';
+                    });
+                    container.appendChild(input);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplication Distribution Minigame</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .expression-container {
+            font-size: 3rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Color classes for backgrounds */
+        .a-val { background-color: #ffcccc; padding: 0 10px; border-radius: 5px; }
+        .b-val { background-color: #cce5ff; padding: 0 10px; border-radius: 5px; }
+        .c-val { background-color: #eeeeee; padding: 0 10px; border-radius: 5px; }
+
+        #second-part {
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: all 0.5s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-left: 10px;
+        }
+
+        #second-part.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            color: #888;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body onclick="showDistribution()">
+
+    <div class="expression-container">
+        <span>(</span>
+        <span class="a-val">a</span>
+        <span>+</span>
+        <span class="b-val">b</span>
+        <span>)</span>
+        <span>&middot;</span>
+        <span class="c-val">c</span>
+
+        <div id="second-part">
+            <span>=</span>
+            <span class="a-val">a</span>
+            <span>&middot;</span>
+            <span class="c-val">c</span>
+            <span>+</span>
+            <span class="b-val">b</span>
+            <span>&middot;</span>
+            <span class="c-val">c</span>
+        </div>
+    </div>
+
+    <div class="hint" id="hint-text">Click anywhere to distribute</div>
+
+    <script>
+        function showDistribution() {
+            const secondPart = document.getElementById('second-part');
+            const hint = document.getElementById('hint-text');
+            
+            secondPart.classList.add('visible');
+            hint.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

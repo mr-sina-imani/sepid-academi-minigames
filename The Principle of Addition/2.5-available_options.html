@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combinatorics Minigame: Principle of Sum</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+
+        h1 {
+            color: #007bff;
+            margin-bottom: 0.5em;
+        }
+
+        p.problem {
+            font-size: 1.1em;
+            max-width: 600px;
+            text-align: center;
+            margin-bottom: 2em;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .code-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .digit-placeholder {
+            width: 70px;
+            height: 90px;
+            font-size: 4em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid #ccc;
+            border-radius: 8px;
+            background-color: #fff;
+            transition: border-color 0.3s, background-color 0.3s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .active {
+            border-color: #28a745;
+            background-color: #e6ffe9;
+        }
+
+        .options-container {
+            min-height: 40px;
+            margin-bottom: 20px;
+        }
+
+        .options-list {
+            font-size: 1.2em;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #ffc107; /* Warning color for options */
+            color: #333;
+            font-weight: bold;
+        }
+
+        .message {
+            font-size: 1.1em;
+            color: #007bff;
+            font-weight: bold;
+        }
+
+        .message.success {
+            color: #28a745;
+        }
+
+        .message.error {
+            color: #dc3545;
+        }
+
+        .instruction {
+            margin-top: 1em;
+            padding: 10px;
+            background-color: #eee;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .instruction strong {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Multiple-Digit Code Minigame</h1>
+
+    <p class="problem">
+        **Problem:** How many 2-digit codes exist, where the **second digit** (D2) is a positive integer (1-9) and is a **multiple** of the **first digit** (D1)?
+    </p>
+
+    <div class="code-container">
+        <div id="digit1" class="digit-placeholder active">_</div>
+        <div id="digit2" class="digit-placeholder">_</div>
+    </div>
+
+    <div class="options-container">
+        <div id="options-display"></div>
+    </div>
+
+    <p id="message" class="message">Press a digit (0-9) to start with the first number.</p>
+
+    <p class="instruction">
+        **Current Action:** <span id="current-action">Input First Digit (D1)</span>. <br>
+        **Reset:** Press the **[Spacebar]** key at any time to reset the game.
+    </p>
+
+    <script>
+        const d1El = document.getElementById('digit1');
+        const d2El = document.getElementById('digit2');
+        const optionsEl = document.getElementById('options-display');
+        const messageEl = document.getElementById('message');
+        const actionEl = document.getElementById('current-action');
+
+        let state = {
+            d1: null,
+            d2: null,
+            phase: 1, // 1: Input D1, 2: Input D2 (from options), 3: Complete
+            possibleD2: []
+        };
+
+        // --- Core Logic ---
+
+        /**
+         * Calculates possible second digits based on the first digit (D1).
+         * D2 must be in [1, 9] and D2 % D1 == 0.
+         * @param {number} d1 - The first digit (0-9).
+         * @returns {number[]} Array of valid D2 digits.
+         */
+        function calculatePossibleD2(d1) {
+            if (d1 === 0) {
+                // Division by zero is undefined, and 0's only non-zero multiple is... 0.
+                // Since D2 must be in [1, 9], no valid D2 exists for D1=0.
+                return [];
+            }
+            const multiples = [];
+            // Check multiples: d1 * 1, d1 * 2, d1 * 3, ...
+            for (let k = 1; ; k++) {
+                const multiple = d1 * k;
+                if (multiple >= 1 && multiple <= 9) {
+                    multiples.push(multiple);
+                } else if (multiple > 9) {
+                    break; // Stop checking when the multiple exceeds 9
+                }
+            }
+            return multiples;
+        }
+
+        // --- UI Updates ---
+
+        function updateUI() {
+            d1El.textContent = state.d1 === null ? '_' : state.d1;
+            d2El.textContent = state.d2 === null ? '_' : state.d2;
+
+            d1El.classList.remove('active');
+            d2El.classList.remove('active');
+
+            optionsEl.innerHTML = '';
+            messageEl.className = 'message'; // Reset message class
+
+            if (state.phase === 1) {
+                d1El.classList.add('active');
+                messageEl.textContent = 'Press a digit (0-9) to start with the first number.';
+                actionEl.textContent = 'Input First Digit (D1)';
+            } else if (state.phase === 2) {
+                d2El.classList.add('active');
+                actionEl.textContent = 'Input Second Digit (D2)';
+
+                if (state.possibleD2.length > 0) {
+                    optionsEl.innerHTML = `<div class="options-list">
+                        **Available Options for D2** (multiples of ${state.d1}): ${state.possibleD2.join(', ')}
+                    </div>`;
+                    messageEl.textContent = `Type one of the available digits (${state.possibleD2.join(', ')}).`;
+                } else {
+                    // This happens when D1 is 0
+                    optionsEl.innerHTML = `<div class="options-list" style="background-color: #dc3545; color: white;">
+                        **NO Available Options for D2** (since D1=0)
+                    </div>`;
+                    messageEl.textContent = `No valid second digit exists for D1 = ${state.d1}. Press [Spacebar] to reset.`;
+                }
+            } else if (state.phase === 3) {
+                messageEl.classList.add('success');
+                messageEl.textContent = `Code ${state.d1}${state.d2} is a VALID code! Press [Spacebar] to try another case.`;
+                actionEl.textContent = 'Complete (Press Spacebar)';
+            }
+        }
+
+        function resetGame() {
+            state.d1 = null;
+            state.d2 = null;
+            state.phase = 1;
+            state.possibleD2 = [];
+            updateUI();
+        }
+
+        // --- Event Listener ---
+
+        document.addEventListener('keydown', (event) => {
+            const key = event.key;
+
+            // Global reset on Spacebar
+            if (key === ' ') {
+                event.preventDefault(); // Prevent spacebar from scrolling
+                resetGame();
+                return;
+            }
+
+            // Check if the key is a single digit (0-9)
+            const digit = parseInt(key);
+            if (isNaN(digit) || digit < 0 || digit > 9) {
+                // Ignore non-digit keys unless it's the spacebar handled above
+                return;
+            }
+
+            if (state.phase === 1) {
+                // Input D1
+                state.d1 = digit;
+                state.possibleD2 = calculatePossibleD2(state.d1);
+                state.phase = 2;
+                updateUI();
+            } else if (state.phase === 2) {
+                // Input D2
+                if (state.possibleD2.includes(digit)) {
+                    // Valid D2 chosen
+                    state.d2 = digit;
+                    state.phase = 3;
+                    updateUI();
+                } else {
+                    // Invalid D2 chosen
+                    messageEl.classList.add('error');
+                    if (state.possibleD2.length > 0) {
+                         messageEl.textContent = `INCORRECT! ${digit} is not a valid multiple of ${state.d1} (or is not between 1-9). Try again or press [Spacebar].`;
+                    } else {
+                         messageEl.textContent = `INCORRECT! There are NO valid options for D1=${state.d1}. Press [Spacebar].`;
+                    }
+                }
+            }
+        });
+
+        // Initialize the game state when the page loads
+        resetGame();
+
+    </script>
+
+</body>
+</html>

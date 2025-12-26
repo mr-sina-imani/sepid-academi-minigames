@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4-Rooks Challenge</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --board-border: #333;
+            --cell-white: #eeeed2;
+            --cell-black: #769656;
+            --highlight-color: #ff4444; /* Red for lines */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { margin-bottom: 10px; color: #333; }
+        p { color: #555; margin-bottom: 20px; }
+
+        /* Game Container */
+        .game-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        /* The Board */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(4, 80px);
+            grid-template-rows: repeat(4, 80px);
+            border: 5px solid var(--board-border);
+            position: relative;
+            user-select: none;
+        }
+
+        /* Board Cells */
+        .cell {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 50px;
+            cursor: default;
+        }
+
+        .cell.white { background-color: var(--cell-white); }
+        .cell.black { background-color: var(--cell-black); }
+
+        /* The SVG Overlay for red lines */
+        .lines-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through to the board */
+            z-index: 10;
+        }
+
+        line {
+            stroke: var(--highlight-color);
+            stroke-width: 4px;
+            stroke-linecap: round;
+            opacity: 0.8;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        /* Draggable Rook */
+        .rook {
+            cursor: grab;
+            transition: transform 0.1s;
+            z-index: 5;
+        }
+        .rook:active { cursor: grabbing; }
+        .rook.dragging { opacity: 0.5; }
+
+        /* The Bench (Starting Area) */
+        .bench {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            min-height: 80px;
+            min-width: 320px;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .bench-slot {
+            width: 60px;
+            height: 60px;
+            background: #e0e0e0;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+        }
+
+        /* Feedback Message */
+        #message {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            height: 1.5em; /* Prevent layout shift */
+        }
+        .success { color: green; }
+        .failure { color: red; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 0.8; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>4-Rooks Challenge</h1>
+    <p>Drag the 4 Rooks onto the board so that no two Rooks share a row or column.</p>
+
+    <div class="game-container">
+        <div class="board" id="board">
+            <svg class="lines-overlay" id="svgOverlay" viewBox="0 0 320 320"></svg>
+            </div>
+    </div>
+
+    <div class="bench" id="bench">
+        </div>
+
+    <div id="message"></div>
+    <button onclick="resetGame()" style="margin-top:15px; padding: 8px 16px; cursor:pointer;">Reset</button>
+
+    <script>
+        const boardEl = document.getElementById('board');
+        const benchEl = document.getElementById('bench');
+        const messageEl = document.getElementById('message');
+        const svgEl = document.getElementById('svgOverlay');
+        const n = 4;
+        const cellSize = 80; // Needed for drawing lines accurately
+
+        // Initialize Game
+        function initGame() {
+            boardEl.innerHTML = '<svg class="lines-overlay" id="svgOverlay" viewBox="0 0 320 320"></svg>'; 
+            benchEl.innerHTML = '';
+            messageEl.textContent = '';
+            
+            // 1. Create Board Cells
+            for (let r = 0; r < n; r++) {
+                for (let c = 0; c < n; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    // Checkerboard pattern logic
+                    cell.classList.add((r + c) % 2 === 0 ? 'white' : 'black');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    
+                    // Drop Event Listeners
+                    cell.addEventListener('dragover', handleDragOver);
+                    cell.addEventListener('drop', handleDrop);
+                    
+                    boardEl.appendChild(cell);
+                }
+            }
+
+            // 2. Create Rooks on the Bench
+            for (let i = 0; i < n; i++) {
+                const slot = document.createElement('div');
+                slot.classList.add('bench-slot');
+                
+                // Allow dropping back to bench
+                slot.addEventListener('dragover', handleDragOver);
+                slot.addEventListener('drop', handleDrop);
+
+                const rook = document.createElement('div');
+                rook.classList.add('rook');
+                rook.textContent = '♜'; // Unicode Rook
+                rook.draggable = true;
+                rook.id = `rook-${i}`;
+                
+                // Drag Event Listeners
+                rook.addEventListener('dragstart', handleDragStart);
+                rook.addEventListener('dragend', handleDragEnd);
+
+                slot.appendChild(rook);
+                benchEl.appendChild(slot);
+            }
+        }
+
+        // --- Drag and Drop Logic ---
+
+        let draggedItem = null;
+
+        function handleDragStart(e) {
+            draggedItem = this;
+            setTimeout(() => this.classList.add('dragging'), 0);
+            // Clear feedback when user starts moving pieces again
+            clearFeedback();
+        }
+
+        function handleDragEnd() {
+            this.classList.remove('dragging');
+            draggedItem = null;
+            checkGameState();
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault(); // Necessary to allow dropping
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            // Ensure we are dropping into a cell or a bench slot, not on top of another rook
+            let target = e.target;
+
+            // If user drops ON a rook, find the parent cell/slot
+            if (target.classList.contains('rook')) {
+                // Determine if we should swap or just block? 
+                // For simplicity, let's just find the parent cell.
+                target = target.parentElement; 
+            }
+
+            // Check if the target is empty (cell or bench-slot)
+            // Note: We check children.length. If > 0, there's already a rook there.
+            // Exception: The SVG overlay is a child of the board, but not the cells.
+            if ((target.classList.contains('cell') || target.classList.contains('bench-slot')) && target.children.length === 0) {
+                target.appendChild(draggedItem);
+            }
+        }
+
+        // --- Game Logic ---
+
+        function checkGameState() {
+            // 1. Find all rooks currently on the board
+            const cells = document.querySelectorAll('.cell');
+            const placedRooks = [];
+
+            cells.forEach(cell => {
+                if (cell.children.length > 0 && cell.children[0].classList.contains('rook')) {
+                    placedRooks.push({
+                        element: cell.children[0],
+                        row: parseInt(cell.dataset.row),
+                        col: parseInt(cell.dataset.col),
+                        centerX: (parseInt(cell.dataset.col) * cellSize) + (cellSize / 2),
+                        centerY: (parseInt(cell.dataset.row) * cellSize) + (cellSize / 2)
+                    });
+                }
+            });
+
+            // 2. Only validate if all 4 rooks are on the board
+            if (placedRooks.length === n) {
+                validatePlacement(placedRooks);
+            }
+        }
+
+        function validatePlacement(rooks) {
+            let conflicts = [];
+            
+            // Compare every rook with every other rook
+            for (let i = 0; i < rooks.length; i++) {
+                for (let j = i + 1; j < rooks.length; j++) {
+                    const r1 = rooks[i];
+                    const r2 = rooks[j];
+
+                    // Check Row or Column Conflict
+                    if (r1.row === r2.row || r1.col === r2.col) {
+                        conflicts.push({ r1, r2 });
+                    }
+                }
+            }
+
+            if (conflicts.length === 0) {
+                // Success
+                messageEl.textContent = "Success! No Rooks are attacking each other.";
+                messageEl.className = "success";
+            } else {
+                // Failure
+                messageEl.textContent = `Failure! Found ${conflicts.length} attacking pair(s).`;
+                messageEl.className = "failure";
+                drawConflicts(conflicts);
+            }
+        }
+
+        // --- Visualization ---
+
+        function drawConflicts(conflicts) {
+            const svg = document.getElementById('svgOverlay');
+            // Clear previous lines
+            svg.innerHTML = ''; 
+
+            conflicts.forEach(pair => {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                
+                line.setAttribute('x1', pair.r1.centerX);
+                line.setAttribute('y1', pair.r1.centerY);
+                line.setAttribute('x2', pair.r2.centerX);
+                line.setAttribute('y2', pair.r2.centerY);
+
+                svg.appendChild(line);
+            });
+        }
+
+        function clearFeedback() {
+            messageEl.textContent = '';
+            messageEl.className = '';
+            const svg = document.getElementById('svgOverlay');
+            if(svg) svg.innerHTML = '';
+        }
+
+        function resetGame() {
+            initGame();
+        }
+
+        // Start
+        initGame();
+
+    </script>
+</body>
+</html>

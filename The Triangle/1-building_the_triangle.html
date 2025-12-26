@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pascal's Triangle: Animated Shift</title>
+    <style>
+        :root {
+            --cell-size: 50px;
+            --gap: 15px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f7f6;
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px;
+        }
+
+        h1 { color: #2c3e50; margin-bottom: 5px; }
+        .subtitle { color: #95a5a6; margin-bottom: 30px; }
+
+        #triangle-wrapper {
+            position: relative;
+            /* Height set dynamically based on rows */
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .row {
+            display: flex;
+            justify-content: center;
+            gap: var(--gap);
+            width: 100%;
+            margin-bottom: var(--gap);
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            background: white;
+            border: 2px solid #dcdde1;
+            transition: transform 1.5s cubic-bezier(0.68, -0.55, 0.27, 1.55), 
+                        background-color 0.3s, color 0.3s;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+
+        .static { background-color: #3498db; color: white; border-color: #2980b9; }
+        .correct { background-color: #2ecc71; color: white; border-color: #27ae60; }
+        .wrong { background-color: #e74c3c; color: white; border-color: #c0392b; }
+
+        input.cell { text-align: center; outline: none; }
+        
+        input::-webkit-outer-spin-button,
+
+        input::-webkit-inner-spin-button {
+
+            -webkit-appearance: none;
+
+            margin: 0;
+
+        }
+
+        input[type=number] {
+
+            -moz-appearance: textfield; /* Firefox */
+
+        }
+
+        .controls { margin-top: 40px; }
+        button {
+            padding: 10px 25px;
+            font-size: 1rem;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #34495e; }
+
+        #success-msg {
+            margin-top: 20px;
+            color: #27ae60;
+            font-weight: bold;
+            font-size: 1.2rem;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Pascal's Triangle Builder</h1>
+    <p class="subtitle">Complete the 5 rows to reveal the matrix structure.</p>
+
+    <div id="triangle-wrapper"></div>
+
+    <div id="success-msg">Matrix transformation complete!</div>
+
+    <div class="controls">
+        <button onclick="resetGame()">Reset Game</button>
+    </div>
+
+    <script>
+        const rowCount = 5;
+        const wrapper = document.getElementById('triangle-wrapper');
+        const msg = document.getElementById('success-msg');
+
+        function getPascalValue(r, c) {
+            if (c === 0 || c === r) return 1;
+            return getPascalValue(r - 1, c - 1) + getPascalValue(r - 1, c);
+        }
+
+        function init() {
+            wrapper.innerHTML = '';
+            msg.style.opacity = "0";
+            msg.style.transform = "translateY(10px)";
+
+            for (let r = 0; r < rowCount; r++) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+                rowDiv.id = `row-${r}`;
+
+                for (let c = 0; c <= r; c++) {
+                    const val = getPascalValue(r, c);
+                    const isStatic = (r === 0 && c === 0);
+                    
+                    const el = isStatic ? document.createElement('div') : document.createElement('input');
+                    el.className = isStatic ? 'cell static' : 'cell';
+                    if (!isStatic) {
+                        el.type = 'number';
+                        el.dataset.correct = val;
+                        el.addEventListener('input', checkProgress);
+                    } else {
+                        el.textContent = '1';
+                    }
+                    
+                    rowDiv.appendChild(el);
+                }
+                wrapper.appendChild(rowDiv);
+            }
+        }
+
+        function checkProgress() {
+            const inputs = document.querySelectorAll('input.cell');
+            let allCorrect = true;
+
+            inputs.forEach(input => {
+                const val = parseInt(input.value);
+                const correct = parseInt(input.dataset.correct);
+                
+                if (val === correct) {
+                    input.classList.add('correct');
+                    input.classList.remove('wrong');
+                } else if (!isNaN(val)) {
+                    input.classList.add('wrong');
+                    input.classList.remove('correct');
+                    allCorrect = false;
+                } else {
+                    input.classList.remove('correct', 'wrong');
+                    allCorrect = false;
+                }
+            });
+
+            if (allCorrect) triggerTransformation();
+        }
+
+        function triggerTransformation() {
+            msg.style.opacity = "1";
+            msg.style.transform = "translateY(0)";
+
+            const rows = document.querySelectorAll('.row');
+            
+            rows.forEach((row, rIndex) => {
+                const cells = row.querySelectorAll('.cell');
+                
+                // Calculate how much to shift the row to align left
+                // In flex-center, the row is offset from the left edge.
+                // We want to move it so that the first cell (index 0) starts at the same X.
+                
+                cells.forEach((cell, cIndex) => {
+                    // We use the row index to calculate the offset. 
+                    // To align left, row 0 needs to move the most, row 4 (last) needs to move 0.
+                    const shiftAmount = (rowCount - 1 - rIndex) * (25 + 7.5); // (half cell + half gap)
+                    
+                    cell.style.transform = `translateX(-${shiftAmount}px)`;
+                });
+            });
+        }
+
+        function resetGame() {
+            init();
+        }
+
+        init();
+    </script>
+</body>
+</html>

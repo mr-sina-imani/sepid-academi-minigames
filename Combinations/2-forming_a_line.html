@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sequential Selection Minigame — Division by k!</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f7fb;
+      overflow: hidden;
+    }
+
+    .container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Circle layout */
+    .circle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 420px;
+      height: 420px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+    }
+
+    .object {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #6366f1;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+      user-select: none;
+    }
+
+    .object.used {
+      background: #a5b4fc;
+      cursor: default;
+    }
+
+    /* Placeholder area */
+    .placeholders {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 18px;
+    }
+
+    .slot {
+      width: 60px;
+      height: 60px;
+      border-radius: 12px;
+      border: 2px dashed #9ca3af;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2em;
+      font-weight: 700;
+      color: #9ca3af;
+    }
+
+    .slot.filled {
+      border-style: solid;
+      color: #111827;
+    }
+
+    .caption {
+      position: absolute;
+      top: 24px;
+      width: 100%;
+      text-align: center;
+      font-size: 1.1em;
+    }
+
+    .caption strong {
+      font-weight: 700;
+    }
+
+    .final {
+      position: absolute;
+      bottom: 24px;
+      width: 100%;
+      text-align: center;
+      font-size: 1.15em;
+      font-weight: 700;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+
+    .final.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="caption">
+    Click any object. Each click fills the next position in the sequence.
+  </div>
+
+  <div class="circle" id="circle"></div>
+
+  <div class="placeholders" id="placeholders"></div>
+
+  <div class="final" id="finalText">
+    One ordered sequence chosen.<br>
+    The same <strong>set</strong> of objects could appear in <strong>k!</strong> different orders.
+  </div>
+</div>
+
+<script>
+  const n = 10;
+  const k = 3;
+
+  const circle = document.getElementById('circle');
+  const placeholders = document.getElementById('placeholders');
+  const finalText = document.getElementById('finalText');
+
+  let chosenCount = 0;
+
+  // Create placeholders
+  for (let i = 0; i < k; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    slot.textContent = i + 1;
+    placeholders.appendChild(slot);
+  }
+
+  const slots = Array.from(document.querySelectorAll('.slot'));
+
+  // Create objects on circle
+  const radius = 190;
+  const centerX = 210;
+  const centerY = 210;
+
+  for (let i = 0; i < n; i++) {
+    const angle = (2 * Math.PI / n) * i - Math.PI / 2;
+    const x = centerX + radius * Math.cos(angle) - 22;
+    const y = centerY + radius * Math.sin(angle) - 22;
+
+    const obj = document.createElement('div');
+    obj.className = 'object';
+    obj.textContent = i + 1;
+    obj.style.transform = `translate(${x}px, ${y}px)`;
+
+    obj.addEventListener('click', () => {
+      if (obj.classList.contains('used')) return;
+      if (chosenCount >= k) return;
+
+      const slot = slots[chosenCount];
+      const slotRect = slot.getBoundingClientRect();
+      const circleRect = circle.getBoundingClientRect();
+
+      const targetX = slotRect.left - circleRect.left + (slotRect.width - 44) / 2;
+      const targetY = slotRect.top - circleRect.top + (slotRect.height - 44) / 2;
+
+      obj.style.transform = `translate(${targetX}px, ${targetY}px)`;
+      obj.classList.add('used');
+
+      slot.classList.add('filled');
+      slot.textContent = obj.textContent;
+
+      chosenCount++;
+
+      if (chosenCount === k) {
+        setTimeout(() => finalText.classList.add('show'), 800);
+      }
+    });
+
+    circle.appendChild(obj);
+  }
+</script>
+</body>
+</html>
+
