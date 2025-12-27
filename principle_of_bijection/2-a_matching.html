@@ -3,54 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shape Matcher - Bijection Check</title>
+    <title>Shape Matcher Minigame</title>
     <style>
         :root {
-            --bg-color: #f0f2f5;
+            --bg-color: #ffffff;
             --primary-color: #4a90e2;
             --success-color: #48bb78;
             --error-color: #e53e3e;
         }
 
+        /* Align to top-left for iframe compatibility */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevents scrollbars in 800x420 iframe */
+        }
+
+        /* Precisely sized for 800x420 iframe */
+        .game-wrapper {
+            width: 800px;
+            height: 420px;
+            position: relative;
+            box-sizing: border-box;
+            padding: 20px;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
         }
 
         .game-container {
             position: relative;
             display: flex;
             justify-content: space-between;
-            width: 600px;
-            padding: 50px;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 700px; /* Leave breathing room inside the 800px width */
+            padding: 30px;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 10px;
         }
 
         .column {
             display: flex;
             flex-direction: column;
-            gap: 40px;
+            gap: 15px; /* Tighter gap to fit 420px height */
             z-index: 2;
         }
 
         .item {
-            width: 80px;
-            height: 80px;
+            width: 60px;
+            height: 60px;
             display: flex;
             justify-content: center;
             align-items: center;
             background: #fff;
             border: 2px solid #ddd;
-            border-radius: 10px;
-            font-size: 24px;
+            border-radius: 8px;
+            font-size: 20px;
             font-weight: bold;
             cursor: grab;
             user-select: none;
@@ -58,15 +68,14 @@
         }
 
         .number.disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
-            border-color: var(--success-color);
+            border-color: #ccc;
         }
 
         .shape.drag-over {
             border-color: var(--primary-color);
-            background-color: #eef6ff;
-            transform: scale(1.05);
+            background-color: #f0f7ff;
         }
 
         #arrow-canvas {
@@ -79,58 +88,70 @@
         svg { width: 100%; height: 100%; }
         line { stroke: var(--primary-color); stroke-width: 3; }
 
+        .ui-footer {
+            margin-top: 15px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            height: 40px;
+        }
+
         #feedback {
-            margin-top: 30px;
-            padding: 15px 30px;
-            border-radius: 8px;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 14px;
             font-weight: bold;
             display: none;
         }
 
-        .bijection { background-color: #c6f6d5; color: #22543d; border: 1px solid var(--success-color); }
-        .not-bijection { background-color: #fed7d7; color: #822727; border: 1px solid var(--error-color); }
+        .bijection { background-color: #c6f6d5; color: #22543d; }
+        .not-bijection { background-color: #fed7d7; color: #822727; }
         
         button {
-            margin-top: 20px;
-            padding: 10px 20px;
+            padding: 8px 15px;
             cursor: pointer;
-            border: none;
-            background: var(--primary-color);
-            color: white;
-            border-radius: 5px;
+            border: 1px solid #ccc;
+            background: #fff;
+            border-radius: 4px;
+            font-size: 13px;
         }
+        button:hover { background: #f5f5f5; }
     </style>
 </head>
 <body>
 
-<div class="game-container" id="gameContainer">
-    <div id="arrow-canvas">
-        <svg id="svgOverlay">
-            <defs>
-                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#4a90e2" />
-                </marker>
-            </defs>
-        </svg>
+<div class="game-wrapper">
+    <div class="game-container" id="gameContainer">
+        <div id="arrow-canvas">
+            <svg id="svgOverlay">
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#4a90e2" />
+                    </marker>
+                </defs>
+            </svg>
+        </div>
+
+        <div class="column">
+            <div class="item number" draggable="true" id="num-1">1</div>
+            <div class="item number" draggable="true" id="num-3">3</div>
+            <div class="item number" draggable="true" id="num-4">4</div>
+            <div class="item number" draggable="true" id="num-9">9</div>
+        </div>
+
+        <div class="column">
+            <div class="item shape" id="shape-circle">○</div>
+            <div class="item shape" id="shape-triangle">△</div>
+            <div class="item shape" id="shape-segment">―</div>
+            <div class="item shape" id="shape-dot">●</div>
+        </div>
     </div>
 
-    <div class="column" id="numbersCol">
-        <div class="item number" draggable="true" id="num-1">1</div>
-        <div class="item number" draggable="true" id="num-3">3</div>
-        <div class="item number" draggable="true" id="num-4">4</div>
-        <div class="item number" draggable="true" id="num-9">9</div>
-    </div>
-
-    <div class="column" id="shapesCol">
-        <div class="item shape" id="shape-circle">◻</div>
-        <div class="item shape" id="shape-triangle">△</div>
-        <div class="item shape" id="shape-segment">―</div>
-        <div class="item shape" id="shape-dot">●</div>
+    <div class="ui-footer">
+        <div id="feedback"></div>
+        <button onclick="location.reload()">Reset Game</button>
     </div>
 </div>
-
-<div id="feedback"></div>
-<button onclick="location.reload()">!دوباره</button>
 
 <script>
     const numbers = document.querySelectorAll('.number');
@@ -141,7 +162,6 @@
 
     let draggedElement = null;
     let completedMappings = 0;
-    // Store which shape each number points to
     const selectionMap = {}; 
 
     numbers.forEach(num => {
@@ -151,7 +171,9 @@
                 return;
             }
             draggedElement = num;
+            // Set data for the drag event
             e.dataTransfer.setData('text/plain', num.id);
+            // Ghosting effect is native; original stays in place as requested
         });
     });
 
@@ -166,10 +188,7 @@
             
             if (draggedElement) {
                 drawArrow(draggedElement, shape);
-                
-                // Record the mapping
                 selectionMap[draggedElement.id] = shape.id;
-                
                 disableNumber(draggedElement);
                 completedMappings++;
 
@@ -205,19 +224,15 @@
     }
 
     function checkBijection() {
-        const targetShapes = Object.values(selectionMap);
-        const uniqueShapes = new Set(targetShapes);
-
+        const uniqueShapes = new Set(Object.values(selectionMap));
         feedback.style.display = 'block';
         
-        // In this game, since we only allow 4 drops and have 4 numbers:
-        // If uniqueShapes.size is 4, it means every shape was used exactly once.
         if (uniqueShapes.size === numbers.length) {
-            feedback.className = 'bijection';
-            feedback.innerText = ".تناظر برقرار است";
+            feedback.className = 'feedback bijection';
+            feedback.innerText = "One-to-one Bijection achieved!";
         } else {
-            feedback.className = 'not-bijection';
-            feedback.innerText = "!تناظر برقرار نیست";
+            feedback.className = 'feedback not-bijection';
+            feedback.innerText = "Not a Bijection (Multiple inputs to one shape).";
         }
     }
 </script>
