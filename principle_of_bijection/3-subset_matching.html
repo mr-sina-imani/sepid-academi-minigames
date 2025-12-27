@@ -147,18 +147,14 @@
     </style>
 </head>
 <body>
-
-    <h1>Bijection Challenge</h1>
-    <p>
-        <strong>Set S = {1, 2, 3, 4, 5}</strong>. <br>
-        Map every subset of size 2 (Left) to its unique complement of size 3 (Right).
-        Click an item on the left, then click its complement on the right to connect them.
+ <br>
+        اول روی تیم دو نفره در سمت چپ بزنید و بعد روی مکمل اون تیم در سمت چپ
     </p>
 
     <div id="status-area">
         <div id="message" class="message">Matches: 0 / 10</div>
-        <button id="reset-btn" class="btn btn-retry">Validation Failed. Retry?</button>
-        <button id="win-btn" class="btn btn-success" disabled>Success! Play Again?</button>
+        <button id="reset-btn" class="btn btn-retry">دوباره</button>
+        <button id="win-btn" class="btn btn-success" disabled></button>
     </div>
 
     <div id="game-container">
@@ -169,7 +165,7 @@
             </div>
 
         <div class="column" id="col-right">
-            <div class="col-header">Complements (n-k=3)</div>
+            <div class="col-header">مکمل (n-k=3)</div>
             </div>
     </div>
 
@@ -209,12 +205,12 @@
             const svgLayer = document.getElementById('connections-layer');
             
             // Clear previous state
-            leftCol.innerHTML = '<div class="col-header">Subsets (k=2)</div>';
-            rightCol.innerHTML = '<div class="col-header">Complements (n-k=3)</div>';
+            leftCol.innerHTML = '<div class="col-header" dir="rtl">تیم‌ها (k=2)</div>';
+            rightCol.innerHTML = '<div class="col-header" dir="rtl">مکمل‌ها (n-k=3)</div>';
             svgLayer.innerHTML = '';
             pairs = [];
             selectedItem = null;
-            updateStatus("Matches: 0 / 10");
+            updateStatus("انجام شده: 0 / 10");
             document.getElementById('reset-btn').style.display = 'none';
             document.getElementById('win-btn').style.display = 'none';
 
@@ -247,6 +243,7 @@
             div.dataset.id = `${side}-${index}`; // Unique DOM ID reference
             div.id = `${side}-${index}`;
             
+            
             div.addEventListener('click', () => handleItemClick(div));
             return div;
         }
@@ -264,7 +261,7 @@
             }
 
             // 2. If nothing selected, select this one
-            if (!selectedItem) {
+            if (!selectedItem && element.dataset.side === 'left') {
                 select(element);
                 return;
             }
@@ -361,14 +358,14 @@
                 pair.path.remove();
                 // Remove from data
                 pairs.splice(index, 1);
-                updateStatus(`Matches: ${pairs.length} / 10`);
+                updateStatus(`انجام شده: ${pairs.length} / 10`);
             }
         }
 
         // --- Game Loop / Validation ---
 
         function checkGameState() {
-            updateStatus(`Matches: ${pairs.length} / 10`);
+            updateStatus(`انجام شده: ${pairs.length} / 10`);
 
             if (pairs.length === 10) {
                 validateBijection();
@@ -397,10 +394,9 @@
             });
 
             if (allCorrect) {
-                updateStatus("Success! Every subset mapped to its unique complement.", "success");
-                document.getElementById('win-btn').style.display = 'inline-block';
+                updateStatus("!همه‌ش درسته", "success");
             } else {
-                updateStatus("All items paired, but some matches are incorrect.", "error");
+                updateStatus("بعضی از اعضا به جای اشتباهی نگاشت شده اند", "error");
                 document.getElementById('reset-btn').style.display = 'inline-block';
             }
         }
@@ -446,8 +442,6 @@
              initGame();
         });
         
-        document.getElementById('win-btn').addEventListener('click', initGame);
-
         // Start
         initGame();
 
