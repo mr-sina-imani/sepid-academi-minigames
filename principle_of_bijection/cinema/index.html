@@ -1,0 +1,357 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8" />
+    <title>Bijection in Cinema!</title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v33.0.2/dist/font-face.css" rel="stylesheet" />
+    <style>
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: center;
+            z-index: 10;
+            color: #000000;                    /* Neon cyan */
+            font-family: "Vazir", sans-serif;  /* Apply Vazir font */
+            font-size: 20px;
+        }
+
+        /* Remove default browser styling */
+        #peopleSlider {
+            width: 300px;
+            height: 35px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        /* === Track (neon glow) === */
+        #peopleSlider::-webkit-slider-runnable-track {
+            height: 10px;
+            background: #003a3f;
+            border-radius: 5px;
+            box-shadow: 0 0 12px #00eaff;
+        }
+
+        #peopleSlider::-moz-range-track {
+            height: 10px;
+            background: #003a3f;
+            border-radius: 5px;
+            box-shadow: 0 0 12px #00eaff;
+        }
+
+        /* === Thumb (glowing knob) === */
+        #peopleSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #055412;
+            box-shadow: 0 0 15px #025618, 0 0 25px #529a06;
+            margin-top: -6px; /* align center */
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <input id="peopleSlider" type="range" min="1" max="120" value="5">
+    تعداد افراد =
+    <span id="countLabel">5</span>
+</div>
+
+<script type="text/javascript">
+    const WIDTH = 800, HEIGHT = 800;
+    const ROWS = 8, SIDE_COLS = 8;
+    const SIDE_GAP = 100;
+    const TOP_GAP = 100;
+    const BOTTOM_GAP = 200;
+    const MIDDLE_GAP = 75; // Half of the distance between two main columns
+    const ROW_WIDTH = WIDTH/2 - SIDE_GAP - MIDDLE_GAP;
+    const COL_HEIGHT = HEIGHT - TOP_GAP - BOTTOM_GAP;
+    const MOVE_VELOCITY = 250;
+    const GUY_ROW_WIDTH = 15;
+    const DROPPED_CHAIR_COUNT = 23;
+
+    function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]]; // swap
+        }
+        return array;
+    }
+
+    class MyScene extends Phaser.Scene {
+        constructor() {
+            super({ key: "MyScene" });
+        }
+
+        getChairPos(row, col) {
+            let y = TOP_GAP + row * COL_HEIGHT / (ROWS - 1);
+            let x = SIDE_GAP + (col % SIDE_COLS) * ROW_WIDTH / (SIDE_COLS - 1);
+            if (col >= SIDE_COLS) {
+                x += ROW_WIDTH + 2 * MIDDLE_GAP;
+            }
+            return [x, y];
+        }
+
+        getGuyPos(n) {
+            let x, y;
+            [x, y] = this.getChairPos(ROWS - 1, SIDE_COLS - 1);
+            y += 40;
+            x -= 20 * (n % GUY_ROW_WIDTH);
+            y += 20 * Math.floor(n / GUY_ROW_WIDTH);
+            return [x, y];
+        }
+
+        setDestinations(guyIndex) {
+            var guy = this.people[guyIndex];
+            
+            if (guy.destinations === undefined) guy.destinations = [];
+
+            let chairTaken = false;
+            for (let i = 0; i < guyIndex; i++) {
+                if (this.people[i].chairRow == guy.chairRow && this.people[i].chairCol == guy.chairCol) {
+                    chairTaken = true;
+                }
+            }
+
+            guy.chairTaken = chairTaken;
+
+            let chairX, chairY;
+            [chairX, chairY] = this.getChairPos(guy.chairRow, guy.chairCol);
+
+            if (guy.chairRow == ROWS - 1) {
+                if (chairTaken) {
+                    guy.destinations.push(
+                        [chairX, chairY + 30]
+                    );
+                } else {
+                    guy.destinations.push(
+                        [chairX, chairY]
+                    );
+                }
+                return;
+            }
+
+            var gate_start = this.getChairPos(ROWS - 1, SIDE_COLS - 1)[0] + 10;
+            var gate_end = this.getChairPos(ROWS - 1, SIDE_COLS)[0] - 10;
+            var gate_middle = (gate_start + gate_end) / 2;
+            var x, midY;
+            if (guy.chairCol < SIDE_COLS)
+                x = Phaser.Math.FloatBetween(gate_start, gate_middle);
+            else 
+                x = Phaser.Math.FloatBetween(gate_middle, gate_end);
+            guy.destinations.push([x, guy.y]);
+            midY = (chairY + this.getChairPos(guy.chairRow + 1, guy.chairCol)[1]) / 2;
+            guy.destinations.push([x, midY]);
+            guy.destinations.push([chairX, midY]);
+            if (!chairTaken) guy.destinations.push([chairX, chairY]);
+        }
+
+        startNewMove(guy) {
+            if (guy.destinations.length === 0) {
+                guy.setVelocityX(0);
+                guy.setVelocityY(0);
+                guy.anims.play('down', true);
+                this.chairs.forEach(chair => {
+                    if (chair.row == guy.chairRow && chair.col == guy.chairCol) {
+                        chair.setTint(0x00ff55)
+                    }
+                });
+                if (guy.chairTaken) guy.setTint(0xff0000);
+                return;
+            }
+            
+            var destX, destY;
+            [destX, destY] = guy.destinations[0];
+            console.log("dest_x:" + destX);
+            if (this.physics === undefined) {
+                console.log("UNDEFINED!!!");
+            }
+            this.physics.moveTo(guy, destX, destY, MOVE_VELOCITY);
+            console.log('HELLO!');
+            if (destY < guy.y) {
+                guy.anims.play('up', true);
+                console.log('up');
+            } else if (destX > guy.x) {
+                guy.anims.play('right', true);
+                console.log('right');
+            } else if (destX < guy.x) {
+                guy.anims.play('left', true);
+                console.log('left');
+            } else {
+                console.log('ERROR IN DIAGNOSING THE DIRECTION');
+            }
+        }
+
+        preload() {
+            this.load.image('sky', 'assets/sky.png');
+            this.load.image('chair', 'assets/chair.png');
+            this.load.spritesheet('man',
+                'assets/character.png',
+                {
+                    frameWidth: 16,
+                    frameHeight: 18
+                }
+            );
+        }
+
+        updatePeopleCount() {
+            this.peopleSize = parseInt(this.slider.value);
+            this.label.textContent = this.peopleSize;
+            this.people.forEach(p => p.destroy());
+            this.people = [];
+            let availableLocs = structuredClone(this.chairLocations);
+            
+            for (let i = 0; i < this.peopleSize; i++) {
+                var newGuy = this.physics.add.sprite(...this.getGuyPos(i), 'man');
+                if (availableLocs.length > 0) {
+                    let chairIndex = Phaser.Math.Between(0, availableLocs.length - 1);
+                    newGuy.chairRow = availableLocs[chairIndex][0];
+                    newGuy.chairCol = availableLocs[chairIndex][1];
+                    availableLocs.splice(chairIndex, 1);
+                } else {
+                    let chairIndex = Phaser.Math.Between(0, this.chairLocations.length - 1);
+                    newGuy.chairRow = this.chairLocations[chairIndex][0];
+                    newGuy.chairCol = this.chairLocations[chairIndex][1];
+                }
+                this.people.push(newGuy)
+            }
+            for (let i = 0; i < this.peopleSize; i++) this.setDestinations(i);
+            this.chairs.forEach(chair => {
+                chair.clearTint();
+            });
+        }
+
+        chairIsDropped(row, col) {
+            for (let index = 0; index < this.chairLocations.length; index++) {
+                const chairLoc = this.chairLocations[index];
+                if (chairLoc[0] === row && chairLoc[1] === col) return false;
+            }
+            return true;
+        }
+        
+        createChairs() {
+            this.chairs = [];
+            this.chairLocations = [];
+            
+            if (DROPPED_CHAIR_COUNT > ROWS * 2*SIDE_COLS) {
+                alert("Not enough chair to drop!");
+                return;
+            }
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < 2*SIDE_COLS; c++) {
+                    this.chairLocations.push([r, c]);
+                }
+            }
+
+            for (let i = 0; i < DROPPED_CHAIR_COUNT; i++) {
+                let removalIndex = Phaser.Math.Between(0, this.chairLocations.length - 1);
+                this.chairLocations.splice(removalIndex, 1);
+            }
+
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < 2 * SIDE_COLS; c++) {
+                    if (this.chairIsDropped(r, c)) continue;
+                    let x, y;
+                    [x, y] = this.getChairPos(r, c);
+                    var newChair = this.add.image(x, y, 'chair');
+                    newChair.row = r;
+                    newChair.col = c;
+                    this.chairs.push(newChair);
+                }
+            }
+        }
+
+        create() {
+            this.slider = document.getElementById("peopleSlider");
+            this.label  = document.getElementById("countLabel");
+            
+            this.add.image(0, 0, 'sky').setOrigin(0, 0);
+
+            this.createChairs();
+            this.people = [];
+            this.updatePeopleCount(this);
+
+            this.anims.create({
+                key: 'left',
+                frames: this.anims.generateFrameNumbers('man', {start: 6, end: 8}),
+                frameRate: 10,
+                repeat: -1
+            });
+
+            this.anims.create({
+                key: 'right',
+                frames: this.anims.generateFrameNumbers('man', {start: 9, end: 11}),
+                frameRate: 10,
+                repeat: -1
+            });
+
+            this.anims.create({
+                key: 'up',
+                frames: this.anims.generateFrameNumbers('man', {start: 3, end: 5}),
+                frameRate: 10,
+                repeat: -1
+            });
+
+            this.anims.create({
+                key: 'down',
+                frames: [{key: 'man', frame: 0}],
+                frameRate: 1
+            });
+
+            //this.cursors = this.input.keyboard.createCursorKeys();
+            this.space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+            this.slider.addEventListener("input", () => this.updatePeopleCount(this));
+        }
+
+        update() {
+            if (Phaser.Input.Keyboard.JustDown(this.space)) {
+                this.people.forEach(guy => {                
+                    this.startNewMove(guy);
+                });
+            }
+            this.people.forEach(guy => {
+                if (guy.destinations.length > 0) {
+                    var dest_x, dest_y;
+                    [dest_x, dest_y] = guy.destinations[0];
+                    var dist = (guy.x - dest_x) ** 2 + (guy.y - dest_y) ** 2;
+                    if (dist < 25) {
+                        guy.x = dest_x;
+                        guy.y = dest_y;
+                        guy.destinations.splice(0, 1);
+                        this.startNewMove(guy);
+                    }
+                }
+            });
+        }
+    }
+
+    var config = {
+        type: Phaser.AUTO,
+        width: WIDTH,
+        height: HEIGHT,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                debug: false
+            }
+        },
+        scene: MyScene
+    };
+
+    var game = new Phaser.Game(config);
+
+</script>
+
+</body>
+</html>
