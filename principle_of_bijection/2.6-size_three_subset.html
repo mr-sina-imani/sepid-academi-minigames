@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Choosing Three Elements</title>
+
+<style>
+  body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    margin-top: 40px;
+  }
+
+  .circle {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    border: 2px solid #444;
+  }
+
+  .item {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e0e0ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.4s, opacity 0.4s;
+  }
+
+  .item.selected {
+    background: #6fa8ff;
+    color: white;
+  }
+
+  .item.completed {
+    background: #6fa8ff;
+    color: white;
+  }
+
+  .item[data-value="1"] { top: -10px; left: 90px; }
+  .item[data-value="2"] { right: -10px; top: 90px; }
+  .item[data-value="3"] { bottom: -10px; left: 90px; }
+  .item[data-value="4"] { left: -10px; top: 90px; }
+
+  .placeholders {
+    display: flex;
+    gap: 12px;
+  }
+
+  .slot {
+    width: 90px;
+    height: 40px;
+    border: 2px dashed #888;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+</style>
+</head>
+
+<body>
+
+<h3>Select three elements from {1, 2, 3, 4}</h3>
+
+<div class="circle">
+  <div class="item" data-value="1">1</div>
+  <div class="item" data-value="2">2</div>
+  <div class="item" data-value="3">3</div>
+  <div class="item" data-value="4">4</div>
+</div>
+
+<div class="placeholders">
+  <div class="slot"></div>
+  <div class="slot"></div>
+  <div class="slot"></div>
+  <div class="slot"></div>
+</div>
+
+<script>
+  const selected = new Set();
+  const registered = new Set();
+  const slots = document.querySelectorAll(".slot");
+  const items = document.querySelectorAll(".item");
+  let locked = false;
+
+  function resetVisuals() {
+    items.forEach(i => {
+      i.classList.remove("selected", "completed");
+    });
+    selected.clear();
+    locked = false;
+  }
+
+  items.forEach(item => {
+    item.addEventListener("click", () => {
+      if (locked) return;
+
+      const value = item.dataset.value;
+
+      if (selected.has(value)) return;
+
+      selected.add(value);
+      item.classList.add("selected");
+
+      if (selected.size === 3) {
+        locked = true;
+        item.classList.add("completed");
+
+        const subset = [...selected].join(",");
+	const subset_sorted = [...selected].sort().join(",");
+        setTimeout(() => {
+          if (!registered.has(subset_sorted)) {
+            registered.add(subset_sorted);
+            for (const slot of slots) {
+              if (slot.textContent === "") {
+                slot.textContent = `{${subset}}`;
+                break;
+              }
+            }
+          }
+
+          resetVisuals();
+        }, 700);
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
+

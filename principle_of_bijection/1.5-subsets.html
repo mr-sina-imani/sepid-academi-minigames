@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subset Selection Game</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --success-color: #2ecc71;
+            --error-color: #e74c3c;
+            --bg-color: #f4f6f7;
+            --circle-radius: 120px;
+            --item-size: 50px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        #game-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 400px;
+            max-width: 90%;
+        }
+
+        /* The Target Display (e.g. {1, 2}) */
+        .target-display {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 20px 0;
+            font-family: 'Courier New', Courier, monospace;
+            background: #ecf0f1;
+            padding: 10px;
+            border-radius: 8px;
+            border: 2px solid #bdc3c7;
+        }
+
+        /* The Circle Area */
+        .circle-area {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto 20px auto;
+            /* Border removed as per request, but container kept for sizing */
+        }
+
+        /* The Selectable Numbers */
+        .number-btn {
+            position: absolute;
+            width: var(--item-size);
+            height: var(--item-size);
+            background-color: white;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            
+            /* Center the item relative to its coordinate */
+            transform: translate(-50%, -50%); 
+        }
+
+        .number-btn:hover {
+            background-color: #eaf6fd;
+        }
+
+        .number-btn.selected {
+            background-color: var(--primary-color);
+            color: white;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+        }
+
+        /* Controls */
+        #check-btn {
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        #check-btn:hover {
+            background-color: #34495e;
+        }
+
+        #message {
+            height: 20px;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        .msg-success { color: var(--success-color); }
+        .msg-error { color: var(--error-color); }
+
+        /* Animation for wrong answer shake */
+        .shake {
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <h1>Subset Builder</h1>
+        <p>Select the numbers belonging to this set:</p>
+        
+        <div id="target-set" class="target-display">Loading...</div>
+
+        <div class="circle-area" id="circle-area">
+            </div>
+
+        <button id="check-btn" onclick="checkAnswer()">Check Answer</button>
+        <div id="message"></div>
+    </div>
+
+    <script>
+        // Game Configuration
+        const maxNumber = 5;
+        // The levels defined in your prompt
+        const levels = [
+            { label: "{2, 5, 1}",   required: [1, 2, 5] },
+            { label: "{4, 3}",      required: [3, 4] },
+            { label: "{3, 4}",      required: [3, 4] }, // Same answer, different display
+            { label: "{1, 2, 3, 4, 5}", required: [1, 2, 3, 4, 5] },
+            { label: "{}",          required: [] },     // Empty set
+            { label: "{1, 2}",      required: [1, 2] }
+        ];
+
+        let currentLevelIndex = 0;
+        let selectedNumbers = new Set();
+
+        const circleArea = document.getElementById('circle-area');
+        const targetDisplay = document.getElementById('target-set');
+        const messageDisplay = document.getElementById('message');
+        const container = document.getElementById('game-container');
+
+        // Initialize the circle of numbers (1 to 5)
+        function initBoard() {
+            const radius = 120; // Distance from center
+            const centerX = 150; // Half of circle-area width
+            const centerY = 150; // Half of circle-area height
+            const step = (2 * Math.PI) / maxNumber;
+
+            for (let i = 1; i <= maxNumber; i++) {
+                // Calculate position (-PI/2 starts at 12 o'clock)
+                const angle = (i * step) - (Math.PI / 2) - step; 
+                
+                // Using standard math for coordinates
+                const x = Math.round(centerX + radius * Math.cos(angle));
+                const y = Math.round(centerY + radius * Math.sin(angle));
+
+                const btn = document.createElement('div');
+                btn.classList.add('number-btn');
+                btn.innerText = i;
+                btn.dataset.value = i;
+                btn.style.left = `${x}px`;
+                btn.style.top = `${y}px`;
+                
+                // Click handler
+                btn.onclick = () => toggleNumber(i, btn);
+                
+                circleArea.appendChild(btn);
+            }
+            loadLevel();
+        }
+
+        // Load the current level text
+        function loadLevel() {
+            if (currentLevelIndex >= levels.length) {
+                targetDisplay.innerText = "Complete!";
+                messageDisplay.className = "msg-success";
+                messageDisplay.innerText = "You finished all exercises!";
+                document.getElementById('check-btn').style.display = 'none';
+                return;
+            }
+
+            const level = levels[currentLevelIndex];
+            targetDisplay.innerText = level.label;
+            messageDisplay.innerText = "";
+            resetSelectionVisuals();
+        }
+
+        // Toggle selection state
+        function toggleNumber(num, btnElement) {
+            if (selectedNumbers.has(num)) {
+                selectedNumbers.delete(num);
+                btnElement.classList.remove('selected');
+            } else {
+                selectedNumbers.add(num);
+                btnElement.classList.add('selected');
+            }
+        }
+
+        // Check logic
+        function checkAnswer() {
+            const currentLevel = levels[currentLevelIndex];
+            const correctSet = new Set(currentLevel.required);
+
+            // 1. Check size match
+            if (selectedNumbers.size !== correctSet.size) {
+                handleIncorrect();
+                return;
+            }
+
+            // 2. Check content match
+            for (let num of selectedNumbers) {
+                if (!correctSet.has(num)) {
+                    handleIncorrect();
+                    return;
+                }
+            }
+
+            // If we get here, it's correct
+            handleCorrect();
+        }
+
+        function handleCorrect() {
+            messageDisplay.className = "msg-success";
+            messageDisplay.innerText = "Correct!";
+            
+            setTimeout(() => {
+                currentLevelIndex++;
+                loadLevel();
+            }, 1000);
+        }
+
+        function handleIncorrect() {
+            messageDisplay.className = "msg-error";
+            messageDisplay.innerText = "Incorrect. Try again.";
+            
+            // Shake effect
+            container.classList.add('shake');
+            setTimeout(() => container.classList.remove('shake'), 500);
+
+            // Reset logic
+            resetSelectionVisuals();
+        }
+
+        function resetSelectionVisuals() {
+            selectedNumbers.clear();
+            const btns = document.querySelectorAll('.number-btn');
+            btns.forEach(btn => btn.classList.remove('selected'));
+        }
+
+        // Start game
+        initBoard();
+    </script>
+</body>
+</html>
