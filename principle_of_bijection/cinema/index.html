@@ -62,23 +62,23 @@
 <body>
 
 <div id="ui">
-    <input id="peopleSlider" type="range" min="1" max="90" value="5">
+    <input id="peopleSlider" type="range" min="1" max="80" value="5">
     تعداد افراد =
     <span id="countLabel">5</span>
 </div>
 
 <script type="text/javascript">
-    const WIDTH = 800, HEIGHT = 600;
-    const ROWS = 6, SIDE_COLS = 8;
+    const WIDTH = 800, HEIGHT = 420;
+    const ROWS = 5, SIDE_COLS = 8;
     const SIDE_GAP = 100;
     const TOP_GAP = 100;
-    const BOTTOM_GAP = 150;
+    const BOTTOM_GAP = 130;
     const MIDDLE_GAP = 75; // Half of the distance between two main columns
     const ROW_WIDTH = WIDTH/2 - SIDE_GAP - MIDDLE_GAP;
     const COL_HEIGHT = HEIGHT - TOP_GAP - BOTTOM_GAP;
     const MOVE_VELOCITY = 250;
-    const GUY_ROW_WIDTH = 15;
-    const DROPPED_CHAIR_COUNT = 23;
+    const GUY_ROW_WIDTH = 16;
+    const DROPPED_CHAIR_COUNT = 24;
 
     function shuffle(array) {
         for (let i = array.length - 1; i > 0; i--) {
