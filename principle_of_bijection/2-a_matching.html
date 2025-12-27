@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shape Matcher - Bijection Check</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --primary-color: #4a90e2;
+            --success-color: #48bb78;
+            --error-color: #e53e3e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .game-container {
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            width: 600px;
+            padding: 50px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            z-index: 2;
+        }
+
+        .item {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #fff;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: grab;
+            user-select: none;
+            transition: all 0.2s;
+        }
+
+        .number.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: var(--success-color);
+        }
+
+        .shape.drag-over {
+            border-color: var(--primary-color);
+            background-color: #eef6ff;
+            transform: scale(1.05);
+        }
+
+        #arrow-canvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        svg { width: 100%; height: 100%; }
+        line { stroke: var(--primary-color); stroke-width: 3; }
+
+        #feedback {
+            margin-top: 30px;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .bijection { background-color: #c6f6d5; color: #22543d; border: 1px solid var(--success-color); }
+        .not-bijection { background-color: #fed7d7; color: #822727; border: 1px solid var(--error-color); }
+        
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container" id="gameContainer">
+    <div id="arrow-canvas">
+        <svg id="svgOverlay">
+            <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#4a90e2" />
+                </marker>
+            </defs>
+        </svg>
+    </div>
+
+    <div class="column" id="numbersCol">
+        <div class="item number" draggable="true" id="num-1">1</div>
+        <div class="item number" draggable="true" id="num-3">3</div>
+        <div class="item number" draggable="true" id="num-4">4</div>
+        <div class="item number" draggable="true" id="num-9">9</div>
+    </div>
+
+    <div class="column" id="shapesCol">
+        <div class="item shape" id="shape-circle">◻</div>
+        <div class="item shape" id="shape-triangle">△</div>
+        <div class="item shape" id="shape-segment">―</div>
+        <div class="item shape" id="shape-dot">●</div>
+    </div>
+</div>
+
+<div id="feedback"></div>
+<button onclick="location.reload()">!دوباره</button>
+
+<script>
+    const numbers = document.querySelectorAll('.number');
+    const shapes = document.querySelectorAll('.shape');
+    const svgOverlay = document.getElementById('svgOverlay');
+    const container = document.getElementById('gameContainer');
+    const feedback = document.getElementById('feedback');
+
+    let draggedElement = null;
+    let completedMappings = 0;
+    // Store which shape each number points to
+    const selectionMap = {}; 
+
+    numbers.forEach(num => {
+        num.addEventListener('dragstart', (e) => {
+            if (num.classList.contains('disabled')) {
+                e.preventDefault();
+                return;
+            }
+            draggedElement = num;
+            e.dataTransfer.setData('text/plain', num.id);
+        });
+    });
+
+    shapes.forEach(shape => {
+        shape.addEventListener('dragover', (e) => e.preventDefault());
+        shape.addEventListener('dragenter', () => shape.classList.add('drag-over'));
+        shape.addEventListener('dragleave', () => shape.classList.remove('drag-over'));
+
+        shape.addEventListener('drop', (e) => {
+            e.preventDefault();
+            shape.classList.remove('drag-over');
+            
+            if (draggedElement) {
+                drawArrow(draggedElement, shape);
+                
+                // Record the mapping
+                selectionMap[draggedElement.id] = shape.id;
+                
+                disableNumber(draggedElement);
+                completedMappings++;
+
+                if (completedMappings === numbers.length) {
+                    checkBijection();
+                }
+            }
+        });
+    });
+
+    function drawArrow(startEl, endEl) {
+        const rectStart = startEl.getBoundingClientRect();
+        const rectEnd = endEl.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+
+        const x1 = rectStart.right - containerRect.left;
+        const y1 = rectStart.top + (rectStart.height / 2) - containerRect.top;
+        const x2 = rectEnd.left - containerRect.left;
+        const y2 = rectEnd.top + (rectEnd.height / 2) - containerRect.top;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1);
+        line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2);
+        line.setAttribute('y2', y2);
+        line.setAttribute('marker-end', 'url(#arrowhead)');
+        svgOverlay.appendChild(line);
+    }
+
+    function disableNumber(el) {
+        el.classList.add('disabled');
+        el.setAttribute('draggable', 'false');
+    }
+
+    function checkBijection() {
+        const targetShapes = Object.values(selectionMap);
+        const uniqueShapes = new Set(targetShapes);
+
+        feedback.style.display = 'block';
+        
+        // In this game, since we only allow 4 drops and have 4 numbers:
+        // If uniqueShapes.size is 4, it means every shape was used exactly once.
+        if (uniqueShapes.size === numbers.length) {
+            feedback.className = 'bijection';
+            feedback.innerText = ".تناظر برقرار است";
+        } else {
+            feedback.className = 'not-bijection';
+            feedback.innerText = "!تناظر برقرار نیست";
+        }
+    }
+</script>
+
+</body>
+</html>
