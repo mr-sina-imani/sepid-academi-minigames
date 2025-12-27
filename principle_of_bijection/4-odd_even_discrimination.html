@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subset Parity Challenge (n=4)</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --pool-bg: #e2e8f0;
+            --even-bg: #dbeafe; /* Blueish */
+            --even-border: #2563eb;
+            --odd-bg: #fce7f3; /* Pinkish */
+            --odd-border: #db2777;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow: hidden; /* Prevent body scroll, keep game contained */
+        }
+
+        h1 { margin: 10px 0 5px 0; font-size: 1.5rem; }
+        p { margin-top: 0; color: #64748b; text-align: center; max-width: 800px; margin-bottom: 15px; font-size: 0.95rem; }
+
+        /* Game Board Layout */
+        #game-board {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 1100px;
+            height: 65vh; /* Fixed height for scrollable areas */
+            gap: 15px;
+        }
+
+        /* Columns */
+        .zone {
+            flex: 1;
+            border-radius: 12px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: background-color 0.3s, border-color 0.3s;
+            position: relative;
+            overflow-y: auto; /* Scroll if too many cards */
+        }
+
+        /* Custom Scrollbar styling */
+        .zone::-webkit-scrollbar { width: 8px; }
+        .zone::-webkit-scrollbar-track { background: transparent; }
+        .zone::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        .zone-header {
+            font-weight: bold;
+            font-size: 1rem;
+            margin-bottom: 5px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            background: inherit; /* Matches zone bg */
+            z-index: 10;
+            width: 100%;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .counter {
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+            padding: 2px 10px;
+            background: rgba(255,255,255,0.8);
+            border-radius: 12px;
+            font-weight: bold;
+            position: sticky;
+            top: 30px;
+            z-index: 10;
+        }
+
+        /* Specific Styles for Zones */
+        #even-zone {
+            background-color: var(--even-bg);
+            border: 2px dashed var(--even-border);
+        }
+
+        #odd-zone {
+            background-color: var(--odd-bg);
+            border: 2px dashed var(--odd-border);
+        }
+
+        #pool-zone {
+            background-color: var(--pool-bg);
+            border: 2px solid #94a3b8;
+            flex: 1.2; /* Wider to accommodate grid */
+            /* Grid layout for the pool cards */
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        #pool-zone .zone-header, #pool-zone .counter {
+            width: 100%; /* Force header to take full row in flex wrap */
+            background-color: var(--pool-bg);
+        }
+
+        /* Draggable Subset Cards */
+        .subset-card {
+            background-color: var(--card-bg);
+            padding: 8px 12px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            cursor: grab;
+            font-family: monospace;
+            font-size: 1rem;
+            text-align: center;
+            user-select: none;
+            transition: transform 0.1s;
+            border: 2px solid transparent;
+            
+            /* Sizing for the grid in pool */
+            flex-grow: 0;
+            width: auto;
+            min-width: 80px;
+        }
+        
+        /* When card is in a target zone, make it full width */
+        #even-zone .subset-card, #odd-zone .subset-card {
+            width: 85%;
+            margin-bottom: 8px;
+        }
+
+        .subset-card:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+            z-index: 100;
+        }
+
+        /* Drag Over Visual Cue */
+        .zone.drag-over {
+            background-color: #fff;
+            transform: scale(1.005);
+            border-style: solid;
+        }
+
+        /* Feedback Area */
+        #feedback-area {
+            margin-top: 15px;
+            height: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-msg {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            color: white;
+            display: none;
+        }
+        
+        .btn-retry { background-color: var(--error); }
+        .btn-success { background-color: var(--success); }
+
+        /* Validation Colors */
+        .subset-card.correct { border-color: var(--success); background-color: #ecfdf5; color: #064e3b; }
+        .subset-card.wrong { border-color: var(--error); background-color: #fef2f2; color: #7f1d1d; }
+
+    </style>
+</head>
+<body>
+
+    <h1>Parity Partition (n=4)</h1>
+    <p>
+        <strong>Set S = {1, 2, 3, 4}</strong>.<br>
+        Sort the 16 subsets based on their size. <br>
+        Drag <strong>Even</strong> sizes (0, 2, 4) to the Left, and <strong>Odd</strong> sizes (1, 3) to the Right.
+    </p>
+
+    <div id="game-board">
+        <div id="even-zone" class="zone" data-type="even">
+            <div class="zone-header">Even Size (|A|=0, 2, 4)</div>
+            <div class="counter" id="even-count">Count: 0</div>
+            </div>
+
+        <div id="pool-zone" class="zone" data-type="pool">
+            <div class="zone-header">Subset Pool</div>
+            <div class="counter" id="pool-count">Remaining: 16</div>
+            </div>
+
+        <div id="odd-zone" class="zone" data-type="odd">
+            <div class="zone-header">Odd Size (|A|=1, 3)</div>
+            <div class="counter" id="odd-count">Count: 0</div>
+            </div>
+    </div>
+
+    <div id="feedback-area">
+        <div id="status-msg" class="status-msg">Sort the cards to prove the bijection.</div>
+        <button id="retry-btn" class="btn btn-retry">Incorrect. Retry?</button>
+        <button id="success-btn" class="btn btn-success">Success! Reset?</button>
+    </div>
+
+    <script>
+        // --- Data ---
+        const S = [1, 2, 3, 4];
+
+        // Generator: Power Set
+        function getPowerSet(arr) {
+            return arr.reduce(
+                (subsets, value) => subsets.concat(
+                    subsets.map(set => [value, ...set])
+                ),
+                [[]]
+            );
+        }
+
+        // Generate and sort strictly by size for cleaner internal logic, 
+        // though we will shuffle them for display.
+        let allSubsets = getPowerSet(S);
+        
+        let draggedItem = null;
+
+        // --- Init ---
+        function initGame() {
+            const pool = document.getElementById('pool-zone');
+            const evenZone = document.getElementById('even-zone');
+            const oddZone = document.getElementById('odd-zone');
+            
+            // Clear Zones (keep headers/counters, remove cards)
+            clearCards(pool);
+            clearCards(evenZone);
+            clearCards(oddZone);
+
+            // Hide Buttons / Reset Msg
+            document.getElementById('retry-btn').style.display = 'none';
+            document.getElementById('success-btn').style.display = 'none';
+            document.getElementById('status-msg').textContent = "Sort the cards to prove the bijection.";
+            document.getElementById('status-msg').style.color = "var(--text-main)";
+
+            // Shuffle for game
+            const shuffled = [...allSubsets].sort(() => Math.random() - 0.5);
+
+            // Create Cards
+            shuffled.forEach((sub, idx) => {
+                const card = document.createElement('div');
+                card.className = 'subset-card';
+                card.draggable = true;
+                
+                // Format text: Sort numbers inside the subset for readability {1, 4} not {4, 1}
+                sub.sort((a,b) => a - b);
+                card.textContent = sub.length === 0 ? '∅' : `{${sub.join(', ')}}`;
+                
+                card.id = `card-${idx}`;
+                card.dataset.size = sub.length; // Store mathematical size
+                
+                // Add Drag Events
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+
+                pool.appendChild(card);
+            });
+
+            updateCounters();
+        }
+
+        function clearCards(zone) {
+            const cards = zone.querySelectorAll('.subset-card');
+            cards.forEach(c => c.remove());
+        }
+
+        // --- Drag & Drop Logic ---
+
+        const zones = document.querySelectorAll('.zone');
+
+        zones.forEach(zone => {
+            zone.addEventListener('dragover', handleDragOver);
+            zone.addEventListener('dragleave', handleDragLeave);
+            zone.addEventListener('drop', handleDrop);
+        });
+
+        function handleDragStart(e) {
+            draggedItem = this;
+            setTimeout(() => this.style.opacity = '0.5', 0);
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            draggedItem = null;
+            this.style.opacity = '1';
+            zones.forEach(z => z.classList.remove('drag-over'));
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault(); 
+            this.classList.add('drag-over');
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+
+            if (draggedItem) {
+                let targetZone = e.target;
+                // Traverse up to find the .zone div if dropped on a header or another card
+                while (!targetZone.classList.contains('zone')) {
+                    targetZone = targetZone.parentElement;
+                }
+
+                targetZone.appendChild(draggedItem);
+                updateCounters();
+                checkCompletion();
+            }
+        }
+
+        // --- Game Logic ---
+
+        function updateCounters() {
+            const poolCount = document.getElementById('pool-zone').querySelectorAll('.subset-card').length;
+            const evenCount = document.getElementById('even-zone').querySelectorAll('.subset-card').length;
+            const oddCount = document.getElementById('odd-zone').querySelectorAll('.subset-card').length;
+
+            document.getElementById('pool-count').textContent = `Remaining: ${poolCount}`;
+            document.getElementById('even-count').textContent = `Count: ${evenCount}`;
+            document.getElementById('odd-count').textContent = `Count: ${oddCount}`;
+        }
+
+        function checkCompletion() {
+            const poolCount = document.getElementById('pool-zone').querySelectorAll('.subset-card').length;
+            
+            // Validate only when pool is empty
+            if (poolCount === 0) {
+                validate();
+            }
+        }
+
+        function validate() {
+            const evenZoneCards = document.querySelectorAll('#even-zone .subset-card');
+            const oddZoneCards = document.querySelectorAll('#odd-zone .subset-card');
+            
+            let allCorrect = true;
+
+            // Validate Even Zone (Size 0, 2, 4)
+            evenZoneCards.forEach(card => {
+                const size = parseInt(card.dataset.size);
+                if (size % 2 === 0) {
+                    card.classList.add('correct');
+                } else {
+                    card.classList.add('wrong');
+                    allCorrect = false;
+                }
+            });
+
+            // Validate Odd Zone (Size 1, 3)
+            oddZoneCards.forEach(card => {
+                const size = parseInt(card.dataset.size);
+                if (size % 2 !== 0) {
+                    card.classList.add('correct');
+                } else {
+                    card.classList.add('wrong');
+                    allCorrect = false;
+                }
+            });
+
+            const msg = document.getElementById('status-msg');
+            
+            if (allCorrect) {
+                msg.textContent = "Perfect! Exactly 8 Even and 8 Odd subsets.";
+                msg.style.color = "var(--success)";
+                document.getElementById('success-btn').style.display = 'block';
+            } else {
+                msg.textContent = "Oops! Check the sizes. Even={0,2,4}, Odd={1,3}.";
+                msg.style.color = "var(--error)";
+                document.getElementById('retry-btn').style.display = 'block';
+            }
+        }
+
+        // --- Buttons ---
+        document.getElementById('retry-btn').addEventListener('click', initGame);
+        document.getElementById('success-btn').addEventListener('click', initGame);
+
+        // Start
+        initGame();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vertex Pair to Edge Mapping</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --text-main: #334155;
+            --vertex-idle: #cbd5e1;
+            --vertex-hover: #94a3b8;
+            --u-color: #2563eb; /* Blue */
+            --v-color: #dc2626; /* Red */
+            --edge-idle: #e2e8f0;
+            --edge-highlight: #64748b; /* Gray */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+            user-select: none; /* Prevent text selection during rapid clicking */
+        }
+
+        h1 { margin-bottom: 0.5rem; }
+        p { color: #64748b; margin-bottom: 2rem; text-align: center; max-width: 600px;}
+
+        /* Game Container */
+        #game-container {
+            position: relative;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        svg {
+            cursor: default;
+        }
+
+        /* --- SVG Elements Styling --- */
+
+        /* Edges */
+        line.edge {
+            stroke: var(--edge-idle);
+            stroke-width: 2;
+            transition: stroke 0.5s ease, stroke-width 0.5s ease;
+            stroke-linecap: round;
+        }
+
+        line.edge.active {
+            stroke: var(--edge-highlight);
+            stroke-width: 6;
+        }
+
+        /* Vertices */
+        circle.vertex {
+            fill: #fff;
+            stroke: var(--text-main);
+            stroke-width: 2;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        circle.vertex:hover {
+            stroke-width: 4;
+            fill: #f1f5f9;
+        }
+
+        /* Selection States */
+        circle.vertex.selected-u {
+            fill: var(--u-color);
+            stroke: var(--u-color);
+            stroke-width: 0; /* Solid circle */
+        }
+
+        circle.vertex.selected-v {
+            fill: var(--v-color);
+            stroke: var(--v-color);
+            stroke-width: 0;
+        }
+
+        /* Status Text */
+        #status-bar {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            height: 30px;
+            color: var(--text-main);
+        }
+        
+        .instruction { color: #94a3b8; font-size: 0.9rem; margin-top: 5px;}
+
+    </style>
+</head>
+<body>
+
+    <h1>Mapping Pairs to Edges</h1>
+    <p>
+        In a set of 4 items (vertices), how many connections exist? <br>
+        Select a pair of distinct vertices $(u, v)$ to find the unique edge $\{u, v\}$ that connects them.
+    </p>
+
+    <div id="game-container">
+        <svg id="polygon-svg" width="500" height="400">
+            </svg>
+
+        <div id="status-bar">Select the first vertex (u)...</div>
+        <div class="instruction">[Space] to Reset</div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        const DELAY_MS = 600; // The "hesitation" in milliseconds
+
+        // Uneven Polygon Coordinates (Convex but irregular)
+        const verticesData = [
+            { id: 0, x: 100, y: 80 },  // Top Leftish
+            { id: 1, x: 380, y: 50 },  // Top Rightish (Higher)
+            { id: 2, x: 320, y: 320 }, // Bottom Rightish (Pulled in)
+            { id: 3, x: 60, y: 300 }   // Bottom Leftish (Pulled out)
+        ];
+
+        // --- State ---
+        let selection = []; // Stores IDs of selected vertices
+        let isLocked = false; // Prevents clicking during animation or after completion
+
+        // --- DOM Elements ---
+        const svg = document.getElementById('polygon-svg');
+        const statusBar = document.getElementById('status-bar');
+
+        // --- Initialization ---
+        function initGame() {
+            renderGraph();
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') resetGame();
+            });
+        }
+
+        function renderGraph() {
+            svg.innerHTML = ''; // Clear
+
+            // 1. Draw Edges (K4 = Complete Graph)
+            // We draw lines between every pair.
+            for (let i = 0; i < verticesData.length; i++) {
+                for (let j = i + 1; j < verticesData.length; j++) {
+                    createEdge(verticesData[i], verticesData[j]);
+                }
+            }
+
+            // 2. Draw Vertices on top of edges
+            verticesData.forEach(v => {
+                createVertex(v);
+            });
+        }
+
+        function createEdge(v1, v2) {
+            const line = document.createElementNS(SVG_NS, 'line');
+            line.setAttribute('x1', v1.x);
+            line.setAttribute('y1', v1.y);
+            line.setAttribute('x2', v2.x);
+            line.setAttribute('y2', v2.y);
+            line.classList.add('edge');
+            
+            // Unique ID for the edge: "edge-min-max" to handle (u,v) vs (v,u)
+            const id1 = Math.min(v1.id, v2.id);
+            const id2 = Math.max(v1.id, v2.id);
+            line.id = `edge-${id1}-${id2}`;
+            
+            svg.appendChild(line);
+        }
+
+        function createVertex(v) {
+            const circle = document.createElementNS(SVG_NS, 'circle');
+            circle.setAttribute('cx', v.x);
+            circle.setAttribute('cy', v.y);
+            circle.setAttribute('r', 12); // Radius
+            circle.classList.add('vertex');
+            circle.id = `vertex-${v.id}`;
+            circle.dataset.id = v.id;
+            
+            // Event Listener
+            circle.addEventListener('click', () => handleVertexClick(v.id));
+            
+            svg.appendChild(circle);
+        }
+
+        // --- Interaction Logic ---
+
+        function handleVertexClick(id) {
+            if (isLocked) return;
+
+            // 1. First Selection
+            if (selection.length === 0) {
+                selection.push(id);
+                const el = document.getElementById(`vertex-${id}`);
+                el.classList.add('selected-u');
+                statusBar.innerHTML = `u = Vertex ${id + 1}. <span style="font-weight:normal">Select v...</span>`;
+                return;
+            }
+
+            // 2. Second Selection
+            if (selection.length === 1) {
+                const firstId = selection[0];
+
+                // Prevent selecting the same vertex twice
+                if (id === firstId) return;
+
+                selection.push(id);
+                const el = document.getElementById(`vertex-${id}`);
+                el.classList.add('selected-v');
+                
+                statusBar.innerHTML = `Pair (${firstId + 1}, ${id + 1}) selected. Mapping...`;
+                isLocked = true; // Lock input
+
+                // Trigger Hesitation Effect
+                setTimeout(() => {
+                    highlightEdge(selection[0], selection[1]);
+                }, DELAY_MS);
+            }
+        }
+
+        function highlightEdge(id1, id2) {
+            // Find edge ID (ensure canonical order min-max)
+            const min = Math.min(id1, id2);
+            const max = Math.max(id1, id2);
+            const edge = document.getElementById(`edge-${min}-${max}`);
+
+            if (edge) {
+                edge.classList.add('active');
+                statusBar.innerHTML = `Edge {${min + 1}, ${max + 1}} Identified.`;
+            }
+        }
+
+        function resetGame() {
+            // Reset State
+            selection = [];
+            isLocked = false;
+            statusBar.textContent = "Select the first vertex (u)...";
+
+            // Reset Visuals
+            // Remove vertex classes
+            document.querySelectorAll('.vertex').forEach(el => {
+                el.classList.remove('selected-u', 'selected-v');
+            });
+            // Remove edge classes
+            document.querySelectorAll('.edge').forEach(el => {
+                el.classList.remove('active');
+            });
+        }
+
+        // Start
+        initGame();
+
+    </script>
+</body>
+</html>
