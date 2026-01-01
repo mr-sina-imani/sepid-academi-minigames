@@ -213,7 +213,7 @@
         <div id="controls">
             <div class="instruction">Use $\rightarrow$ (Right) and $\uparrow$ (Up) keys to move.</div>
             <div class="instruction">Moves Left: **R: <span id="r-count">5</span>, U: <span id="u-count">4</span>**</div>
-            <div class="movement-string" id="path-string"></div>
+            <div class="movement-string" id="path-string">Path: </div>
             <button id="restart-btn" class="btn">Start Over</button>
         </div>
     </div>
@@ -320,6 +320,7 @@
                 updateDotPosition(newX, newY);
                 rCount.textContent = movesR;
                 uCount.textContent = movesU;
+                pathStringDisplay.textContent = `Path: ${pathString}`;
 
                 checkWinCondition();
                 drawPath();
@@ -355,6 +356,7 @@
             svg.innerHTML = '';
             rCount.textContent = movesR;
             uCount.textContent = movesU;
+            pathStringDisplay.textContent = 'Path: ';
             gameMessage.textContent = '';
             restartBtn.style.display = 'none';
         }
