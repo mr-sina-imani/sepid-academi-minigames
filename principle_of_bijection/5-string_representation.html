@@ -33,12 +33,12 @@
         /* Game Container */
         #game-container {
             display: flex;
-            gap: 50px;
+            gap: 10px;
             padding: 30px 50px;
             background: var(--card-bg, #ffffff);
             border-radius: 12px;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            align-items: center;
+            align-items: flex-start;
         }
 
         /* Left Side: Bit String Manipulation */
@@ -46,7 +46,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-width: 300px;
+            min-width: 250px;
         }
 
         .heading {
@@ -110,8 +110,9 @@
         /* Right Side: Subset Representation */
         #subset-display {
             font-family: monospace;
-            font-size: 3.5rem;
+            font-size: 3rem;
             min-height: 60px;
+            min-width: 350px;
             color: var(--main-color);
             display: flex;
             align-items: center;
@@ -134,7 +135,7 @@
         #arrow {
             font-size: 4rem;
             color: var(--main-color);
-            margin: 0 10px;
+            margin: 30px 30px;
         }
 
         /* Helper Text/Map Key */
@@ -151,31 +152,20 @@
 </head>
 <body>
 
-    <h1>Characteristic Function Minigame</h1>
-    <p>
-        Explore how a subset of the set $\mathbf{S = \{1, 2, 3, 4\}}$ can be modeled by a **4-bit binary string** (characteristic function).
-        <br>
-        **Rule:** If the $i$-th element is IN the subset, the $i$-th bit is **1**. Otherwise, it's **0**.
-    </p>
-
     <div id="game-container">
 
         <div id="bitstring-section">
-            <div class="heading">Binary String (Characteristic Function)</div>
+            <div class="heading">نمایش رشته‌ای</div>
             
             <div id="bit-container">
                 </div>
             
-            <div class="map-key">
-                **Bit Indices Map to Set Elements:**<br>
-                1st bit $\leftrightarrow 1$, 2nd bit $\leftrightarrow 2$, 3rd bit $\leftrightarrow 3$, 4th bit $\leftrightarrow 4$
-            </div>
         </div>
         
         <div id="arrow">→</div>
 
         <div id="subset-section">
-            <div class="heading">Set Notation (Subset A ⊂ S)</div>
+            <div class="heading">نمایش مجموعه‌ای</div>
             
             <div id="subset-display">
                 <span id="open-brace">{</span>
@@ -183,11 +173,6 @@
                 <span id="close-brace">}</span>
             </div>
             
-            <div class="map-key">
-                **Interpretation:**<br>
-                1 $\leftrightarrow$ Element is IN the set<br>
-                0 $\leftrightarrow$ Element is NOT in the set
-            </div>
         </div>
 
     </div>
@@ -218,7 +203,7 @@
                 
                 bitCell.innerHTML = `
                     <div class="bit-value">${bitStringState[index]}</div>
-                    <div class="bit-index">Index ${index + 1} (${element})</div>
+                    <div class="bit-index">${index+1}</div>
                 `;
 
                 bitCell.addEventListener('click', () => flipBit(index, bitCell));
@@ -254,7 +239,7 @@
             // Create the HTML representation of the subset elements
             let subsetHtml = elementsInSubset.map(element => 
                 `<span class="subset-element">${element}</span>`
-            ).join(', '); // Join elements with a comma and a space
+            ).join(','); // Join elements with a comma and a space
 
             // If the set is empty, show nothing inside the braces
             if (elementsInSubset.length === 0) {

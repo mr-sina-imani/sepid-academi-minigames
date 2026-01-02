@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bijection Proof: Even vs Odd Subsets (n=4)</title>
     <style>
         :root {
             --bg-color: #f7f9fc;
@@ -182,17 +181,6 @@
     </style>
 </head>
 <body>
-
-    <h1>Bijection Proof: Odd vs Even Subsets</h1>
-    <p>
-        <strong>Set S = {1, 2, 3, 4}</strong>. Prove that the number of odd-sized subsets (Left) equals the number of even-sized subsets (Right) by finding the unique corresponding pair.
-        <br>
-        The bijection is defined by **flipping the membership of the element 4**:
-        <br>
-        If 4 is **IN** the subset, the matched subset is found by **removing 4**.
-        If 4 is **NOT IN** the subset, the matched subset is found by **adding 4**.
-    </p>
-
     <div id="status-area">
         <div id="message" class="message">Matches: 0 / 8</div>
         <button id="reset-btn" class="btn btn-retry">Validation Failed. Retry?</button>
@@ -203,13 +191,13 @@
         <svg id="connections-layer"></svg>
 
         <div class="column" id="col-odd">
-            <div class="col-header">Odd-Sized Subsets (8 Total)</div>
+            <div class="col-header">تیم‌های فرد</div>
             </div>
 
         <div style="width: 10px;"></div>
 
         <div class="column" id="col-even">
-            <div class="col-header">Even-Sized Subsets (8 Total)</div>
+            <div class="col-header">تیم‌های زوج</div>
             </div>
     </div>
 
@@ -284,12 +272,12 @@
             const allSubsets = getPowerSet(S);
             
             // Clear previous state
-            oddCol.innerHTML = '<div class="col-header">Odd-Sized Subsets (8 Total)</div>';
-            evenCol.innerHTML = '<div class="col-header">Even-Sized Subsets (8 Total)</div>';
+            oddCol.innerHTML = '<div class="col-header">تیم‌های فرد</div>';
+            evenCol.innerHTML = '<div class="col-header">تیم‌های زوج</div>';
             svgLayer.innerHTML = '';
             pairs = [];
             selectedItem = null;
-            updateStatus("Matches: 0 / 8");
+            updateStatus(`تعداد نگاشت‌ها: 8 / ${0}`);
             document.getElementById('reset-btn').style.display = 'none';
             document.getElementById('win-btn').style.display = 'none';
 
@@ -436,14 +424,14 @@
                 pair.el2.classList.remove('selected', 'even-correct', 'even-wrong');
                 pair.path.remove();
                 pairs.splice(index, 1);
-                updateStatus(`Matches: ${pairs.length} / 8`);
+                updateStatus(`تعداد نگاشت‌ها: 8 / ${pairs.length}`);
             }
         }
 
         // --- Game Loop / Validation ---
 
         function checkGameState() {
-            updateStatus(`Matches: ${pairs.length} / 8`);
+            updateStatus(`تعداد نگاشت‌ها: 8 / ${pairs.length}`);
 
             if (pairs.length === 8) {
                 validateBijection();

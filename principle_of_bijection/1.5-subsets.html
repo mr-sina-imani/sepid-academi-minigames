@@ -136,15 +136,14 @@
 <body>
 
     <div id="game-container">
-        <h1>Subset Builder</h1>
-        <p>Select the numbers belonging to this set:</p>
+        <p dir="rtl">اعضای این تیم رو مشخص کن:</p>
         
         <div id="target-set" class="target-display">Loading...</div>
 
         <div class="circle-area" id="circle-area">
             </div>
 
-        <button id="check-btn" onclick="checkAnswer()">Check Answer</button>
+        <button id="check-btn" onclick="checkAnswer()">ارزیابی پاسخ</button>
         <div id="message"></div>
     </div>
 
@@ -156,9 +155,9 @@
             { label: "{2, 5, 1}",   required: [1, 2, 5] },
             { label: "{4, 3}",      required: [3, 4] },
             { label: "{3, 4}",      required: [3, 4] }, // Same answer, different display
-            { label: "{1, 2, 3, 4, 5}", required: [1, 2, 3, 4, 5] },
+            { label: "{4, 5, 1, 3, 2}", required: [1, 2, 3, 4, 5] },
             { label: "{}",          required: [] },     // Empty set
-            { label: "{1, 2}",      required: [1, 2] }
+            { label: "{2, 1}",      required: [1, 2] }
         ];
 
         let currentLevelIndex = 0;
@@ -202,9 +201,9 @@
         // Load the current level text
         function loadLevel() {
             if (currentLevelIndex >= levels.length) {
-                targetDisplay.innerText = "Complete!";
+                targetDisplay.innerText = "!پایان";
                 messageDisplay.className = "msg-success";
-                messageDisplay.innerText = "You finished all exercises!";
+                messageDisplay.innerText = "!همه ی مراحل رو انجام دادی";
                 document.getElementById('check-btn').style.display = 'none';
                 return;
             }
@@ -251,7 +250,7 @@
 
         function handleCorrect() {
             messageDisplay.className = "msg-success";
-            messageDisplay.innerText = "Correct!";
+            messageDisplay.innerText = "درسته!";
             
             setTimeout(() => {
                 currentLevelIndex++;
@@ -261,7 +260,7 @@
 
         function handleIncorrect() {
             messageDisplay.className = "msg-error";
-            messageDisplay.innerText = "Incorrect. Try again.";
+            messageDisplay.innerText = ".نادرست بود! دوباره تلاش کن";
             
             // Shake effect
             container.classList.add('shake');

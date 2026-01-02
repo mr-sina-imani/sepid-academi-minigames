@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -193,40 +193,33 @@
     </style>
 </head>
 <body>
-
-    <h1>Parity Partition (n=4)</h1>
-    <p>
-        <strong>Set S = {1, 2, 3, 4}</strong>.<br>
-        Sort the 16 subsets based on their size. <br>
-        Drag <strong>Even</strong> sizes (0, 2, 4) to the Left, and <strong>Odd</strong> sizes (1, 3) to the Right.
-    </p>
-
     <div id="game-board">
         <div id="even-zone" class="zone" data-type="even">
-            <div class="zone-header">Even Size (|A|=0, 2, 4)</div>
-            <div class="counter" id="even-count">Count: 0</div>
+            <div class="zone-header">تیم‌های زوج</div>
+            <div class="counter" id="even-count">تعداد: 0</div>
             </div>
 
         <div id="pool-zone" class="zone" data-type="pool">
-            <div class="zone-header">Subset Pool</div>
-            <div class="counter" id="pool-count">Remaining: 16</div>
+            <div class="zone-header">همه‌ی تیم‌ها</div>
+            <div class="counter" id="pool-count">باقی‌مانده: 16</div>
             </div>
 
         <div id="odd-zone" class="zone" data-type="odd">
-            <div class="zone-header">Odd Size (|A|=1, 3)</div>
-            <div class="counter" id="odd-count">Count: 0</div>
+            <div class="zone-header">تیم‌های فرد</div>
+            <div class="counter" id="odd-count">تعداد: 0</div>
             </div>
     </div>
 
     <div id="feedback-area">
-        <div id="status-msg" class="status-msg">Sort the cards to prove the bijection.</div>
-        <button id="retry-btn" class="btn btn-retry">Incorrect. Retry?</button>
-        <button id="success-btn" class="btn btn-success">Success! Reset?</button>
+        <div id="status-msg" class="status-msg"></div>
+        <button id="retry-btn" class="btn btn-retry">تلاش مجدد</button>
+        <button id="success-btn" class="btn btn-success">تلاش مجدد</button>
     </div>
 
     <script>
         // --- Data ---
         const S = [1, 2, 3, 4];
+        var gameLock = false;
 
         // Generator: Power Set
         function getPowerSet(arr) {
@@ -246,9 +239,13 @@
 
         // --- Init ---
         function initGame() {
+            gameLock = false;
+
             const pool = document.getElementById('pool-zone');
             const evenZone = document.getElementById('even-zone');
             const oddZone = document.getElementById('odd-zone');
+            const msg = document.getElementById('status-msg');
+            msg.textContent = "";
             
             // Clear Zones (keep headers/counters, remove cards)
             clearCards(pool);
@@ -258,7 +255,6 @@
             // Hide Buttons / Reset Msg
             document.getElementById('retry-btn').style.display = 'none';
             document.getElementById('success-btn').style.display = 'none';
-            document.getElementById('status-msg').textContent = "Sort the cards to prove the bijection.";
             document.getElementById('status-msg').style.color = "var(--text-main)";
 
             // Shuffle for game
@@ -272,7 +268,7 @@
                 
                 // Format text: Sort numbers inside the subset for readability {1, 4} not {4, 1}
                 sub.sort((a,b) => a - b);
-                card.textContent = sub.length === 0 ? '∅' : `{${sub.join(', ')}}`;
+                card.textContent = sub.length === 0 ? '{}' : `{${sub.join(', ')}}`;
                 
                 card.id = `card-${idx}`;
                 card.dataset.size = sub.length; // Store mathematical size
@@ -303,28 +299,33 @@
         });
 
         function handleDragStart(e) {
+            if (gameLock) return;
             draggedItem = this;
             setTimeout(() => this.style.opacity = '0.5', 0);
             e.dataTransfer.effectAllowed = 'move';
         }
 
         function handleDragEnd(e) {
+            if (gameLock) return;
             draggedItem = null;
             this.style.opacity = '1';
             zones.forEach(z => z.classList.remove('drag-over'));
         }
 
         function handleDragOver(e) {
+            if (gameLock) return;
             e.preventDefault(); 
             this.classList.add('drag-over');
             e.dataTransfer.dropEffect = 'move';
         }
 
         function handleDragLeave(e) {
+            if (gameLock) return;
             this.classList.remove('drag-over');
         }
 
         function handleDrop(e) {
+            if (gameLock) return;
             e.preventDefault();
             this.classList.remove('drag-over');
 
@@ -348,9 +349,9 @@
             const evenCount = document.getElementById('even-zone').querySelectorAll('.subset-card').length;
             const oddCount = document.getElementById('odd-zone').querySelectorAll('.subset-card').length;
 
-            document.getElementById('pool-count').textContent = `Remaining: ${poolCount}`;
-            document.getElementById('even-count').textContent = `Count: ${evenCount}`;
-            document.getElementById('odd-count').textContent = `Count: ${oddCount}`;
+            document.getElementById('pool-count').textContent = `باقی‌مانده: ${poolCount}`;
+            document.getElementById('even-count').textContent = `تعداد: ${evenCount}`;
+            document.getElementById('odd-count').textContent = `تعداد: ${oddCount}`;
         }
 
         function checkCompletion() {
@@ -391,13 +392,13 @@
             });
 
             const msg = document.getElementById('status-msg');
-            
+            gameLock = true;
             if (allCorrect) {
-                msg.textContent = "Perfect! Exactly 8 Even and 8 Odd subsets.";
+                msg.textContent = "همه‌ش درسته!";
                 msg.style.color = "var(--success)";
                 document.getElementById('success-btn').style.display = 'block';
             } else {
-                msg.textContent = "Oops! Check the sizes. Even={0,2,4}, Odd={1,3}.";
+                msg.textContent = "بعضی از تیم‌ها به ستون اشتباهی برده شدن";
                 msg.style.color = "var(--error)";
                 document.getElementById('retry-btn').style.display = 'block';
             }
