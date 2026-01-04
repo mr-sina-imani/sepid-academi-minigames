@@ -220,21 +220,14 @@
     </style>
 </head>
 <body>
-
-    <h1>Discover All Paths (2 x 2)</h1>
-    <p>
-        Use <strong>Arrow Keys</strong> (Up/Right) to find every valid path from bottom-left to top-right. <br>
-        There are 6 possible paths. Can you find them all?
-    </p>
-
     <div id="game-layout">
         
         <div class="column storage-col" id="col-left">
-            <div class="storage-header">Paths Found</div>
+            <div class="storage-header">مسیرها</div>
             </div>
 
         <div class="column" id="center-col">
-            <div id="message-area">Start moving!</div>
+            <div id="message-area">!برو</div>
             
             <div id="discovery-zone">
                 <svg id="main-svg" class="path-svg"></svg>
@@ -246,13 +239,13 @@
                 <div id="current-dot"></div>
             </div>
 
-            <div style="color: #94a3b8; font-size: 0.9rem;">
-                Paths Discovered: <span id="counter" style="color:var(--text-main); font-weight:bold;">0</span> / 6
+            <div style="color: #94a3b8; font-size: 0.9rem;" dir="rtl">
+                 مسیرهای پیداشده: <span id="counter" style="color:var(--text-main); font-weight:bold;">0</span> / 6
             </div>
         </div>
 
         <div class="column storage-col" id="col-right">
-            <div class="storage-header">String Notation</div>
+            <div class="storage-header">نمایش رشته‌ای</div>
             </div>
 
     </div>
@@ -397,15 +390,15 @@
 
             if (foundPaths.has(currentString)) {
                 // Duplicate
-                showMessage("Already found!", "dup");
+                showMessage("قبلا پیدا شده بود", "dup");
                 setTimeout(resetDiscoveryZone, 1000);
             } else {
                 // New Path
                 savePath(currentString, [...pathHistory]);
-                showMessage("New Path Found!", "new");
+                showMessage("مسیر جدید", "new");
                 
                 if (foundPaths.size === TOTAL_PATHS) {
-                    showMessage("CONGRATULATIONS! All paths found.", "done");
+                    showMessage("!همه ی مسیرها رو پیدا کردی", "done");
                     // Don't reset, let them bask in glory
                 } else {
                     setTimeout(resetDiscoveryZone, 1000);
@@ -439,7 +432,7 @@
 
             updateVisuals();
             mainSvg.innerHTML = ''; // Clear lines
-            msgArea.innerText = "Find the next path...";
+            msgArea.innerText = "...مسیر بعدی رو پیدا کن";
             msgArea.className = ""; // remove animation classes
         }
 

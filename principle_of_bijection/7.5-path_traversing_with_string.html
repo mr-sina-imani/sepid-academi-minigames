@@ -10,6 +10,8 @@
             --grid-line: #000000;
             --path-color: #ef4444; /* Red path */
             --current-pos: #1e3a8a; /* Dark Blue dot */
+            --btn-color-2: #10b991; /* Green start/end */
+            --btn-color: #c8d20c;
             --start-end-color: #10b981; /* Green start/end */
             --main-text: #1f2937;
             --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -136,6 +138,7 @@
             flex-direction: column;
             align-items: center;
             font-size: 1.1rem;
+            min-width: 200px;
         }
 
         .instruction { margin-bottom: 10px; font-weight: 500;}
@@ -149,15 +152,15 @@
             border-radius: 6px;
             font-size: 1rem;
             cursor: pointer;
-            color: white;
-            background-color: var(--start-end-color);
+            color: black;
+            background-color: var(--btn-color);
             display: none;
         }
         
         #game-message {
             font-size: 1.4rem;
             font-weight: bold;
-            color: var(--start-end-color);
+            color: var(--main-text);
             margin-bottom: 15px;
             min-height: 25px;
         }
@@ -176,11 +179,6 @@
 </head>
 <body>
 
-    <h1>Grid Path Traversals (4 x 5 Grid)</h1>
-    <p>
-        The grid has $N=4$ rows and $M=5$ columns. You must make exactly **4 Up (U)** moves and **5 Right (R)** moves to reach the destination.
-        Every path corresponds to a unique string of 9 letters (e.g., U R R U...).
-    </p>
 
     <div id="game-board-wrapper">
         <svg id="path-svg"></svg>
@@ -211,10 +209,10 @@
     <div id="status-area">
         <div id="game-message"></div>
         <div id="controls">
-            <div class="instruction">Use $\rightarrow$ (Right) and $\uparrow$ (Up) keys to move.</div>
-            <div class="instruction">Moves Left: **R: <span id="r-count">5</span>, U: <span id="u-count">4</span>**</div>
-            <div class="movement-string" id="path-string">Path: </div>
-            <button id="restart-btn" class="btn">Start Over</button>
+            <div class="instruction"></div>
+            <div class="instruction"><span id="r-count"></span><span id="u-count"></span></div>
+            <div class="movement-string" id="path-string">---------</div>
+            <button id="restart-btn" class="btn">دوباره</button>
         </div>
     </div>
 
@@ -278,13 +276,24 @@
             path.classList.add('trajectory');
             svg.appendChild(path);
         }
+        
+        function randomChoice(array) {
+            return array[
+                Math.floor(Math.random() * array.length)
+            ];
+        }
 
         function checkWinCondition() {
             // Destination is (M, 0) in CSS terms, but (M, N) in our math coordinates
             if (currentPos.x === M && currentPos.y === N) {
                  gameActive = false;
-                 gameMessage.textContent = `SUCCESS! Path completed in ${pathString.length} moves.`;
-                 restartBtn.style.display = 'block';
+                 gameMessage.textContent = randomChoice([
+                    '(: به مقصد رسیدی',
+                    '!پایان',
+                    '!مقصد همینجاست',
+                    '!خودشه',
+                ]);
+                 restartBtn.style.backgroundColor = 'var(--btn-color-2)';
                  return true;
             }
             return false;
@@ -318,15 +327,17 @@
                 pathString += moveType;
 
                 updateDotPosition(newX, newY);
-                rCount.textContent = movesR;
-                uCount.textContent = movesU;
-                pathStringDisplay.textContent = `Path: ${pathString}`;
+                augmentedPathString = pathString;
+                for (let i = 0; i < 9 - pathString.length; i++) {
+                    augmentedPathString += '-'
+                }
+                pathStringDisplay.textContent = `${augmentedPathString}`;
 
                 checkWinCondition();
                 drawPath();
             } else if (direction === 'R' || direction === 'U') {
-                gameMessage.textContent = "Cannot move: limit reached or boundary hit.";
-                setTimeout(() => gameMessage.textContent = "", 1500);
+                gameMessage.textContent = "!اینجا مرز جدوله";
+                setTimeout(() => gameMessage.textContent = "", 500);
             }
         }
 
@@ -354,11 +365,10 @@
             setTimeout(() => dot.style.transition = 'all 0.05s ease-out', 10);
             
             svg.innerHTML = '';
-            rCount.textContent = movesR;
-            uCount.textContent = movesU;
-            pathStringDisplay.textContent = 'Path: ';
+            pathStringDisplay.textContent = '---------';
             gameMessage.textContent = '';
-            restartBtn.style.display = 'none';
+            restartBtn.style.display = 'block';
+            restartBtn.style.backgroundColor = 'var(--btn-color)';
         }
 
         // --- Setup ---
