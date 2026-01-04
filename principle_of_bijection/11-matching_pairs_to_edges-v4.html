@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pair-to-Edge Matching Game (Final Arrow Mapping)</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --text-main: #1e293b;
+            --u-color: #2563eb; 
+            --v-color: #dc2626; 
+            --edge-color: #475569; 
+            --box-idle: #e2e8f0;
+            --box-hover: #cbd5e1;
+            --box-selected: #93c5fd;
+            --box-matched: #dcfce7;
+            --vertex-idle: #cbd5e1;
+            --success: #10b981;
+            --error: #433609;
+            --arrow-color: #16a34a; 
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        h1 { margin-bottom: 0.5rem; }
+        p { color: #64748b; margin-bottom: 2rem; text-align: center; max-width: 800px; }
+
+        #game-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 1200px;
+            min-height: 650px;
+        }
+        
+        #mapping-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+            z-index: 10;
+        }
+
+        .match-arrow {
+            fill: none;
+            stroke: var(--arrow-color);
+            stroke-width: 2;
+            marker-end: url(#arrowhead);
+            opacity: 0.6;
+            transition: all 0.2s ease;
+        }
+
+        #game-layout {
+            display: flex;
+            justify-content: space-between;
+            gap: 150px;
+            min-height: inherit;
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            width: 50%;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        #pairs-col { width: calc(50% - 75px); }
+        #edges-col { width: calc(50% - 75px); justify-content: center; }
+
+        .col-header {
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid var(--box-idle);
+            width: 90%; 
+        }
+
+        .pair-box, .edge-box {
+            position: relative;
+            background: #fff;
+            border: 2px solid var(--box-idle);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .pair-box { width: 100%; height: 80px; }
+        .edge-box { width: 80%; height: 120px; }
+
+        .pair-box:hover, .edge-box:hover { border-color: var(--box-hover); }
+
+        .selected {
+            border-color: var(--box-selected) !important;
+            box-shadow: 0 0 0 4px var(--box-selected);
+            transform: scale(1.02);
+        }
+        
+        /* FIXED: Removed pointer-events: none so hover still works after completion */
+        .matched {
+            background-color: var(--box-matched);
+            opacity: 0.8;
+        }
+
+        .pair-box.matched-target { 
+            opacity: 0.3; 
+        }
+
+        /* NEW STYLE: Specific highlight for the 2-to-1 mapping */
+        .pair-box.hover-highlight {
+            opacity: 1 !important;
+            border-color: var(--u-color) !important;
+            box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
+            transform: scale(1.03);
+            z-index: 20;
+        }
+
+        .mini-svg {
+            position: absolute;
+            top: 50%; 
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90px;
+            height: 90px;
+        }
+        
+        .mini-vertex { fill: #fff; stroke: var(--vertex-idle); stroke-width: 1; }
+        .mini-edge { stroke: var(--vertex-idle); stroke-width: 1; stroke-linecap: round; }
+        .pair-box .highlight-u { fill: var(--u-color); stroke: var(--u-color); stroke-width: 0; }
+        .pair-box .highlight-v { fill: var(--v-color); stroke: var(--v-color); stroke-width: 0; }
+        .edge-box .highlight-edge { stroke: var(--edge-color); stroke-width: 4; }
+
+        #status-message {
+            margin-top: 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            height: 50px;
+            text-align: center;
+        }
+
+        #reset-btn {
+            padding: 10px 20px;
+            margin-top: 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            color: white;
+            background-color: var(--edge-color);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-wrapper">
+        <svg id="mapping-svg">
+             <defs>
+                <marker id="arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--arrow-color)" />
+                </marker>
+            </defs>
+        </svg>
+
+        <div id="game-layout">
+            <div class="column" id="pairs-col"><div class="col-header">جفت‌ها</div></div>
+            <div class="column" id="edges-col"><div class="col-header">یال‌ها</div></div>
+        </div>
+    </div>
+
+    <div id="status-message"></div>
+    <button id="reset-btn">دوباره</button>
+
+    <script>
+        const SVG_NS = "http://www.w3.org/2000/svg";
+        const TOTAL_PAIRS = 12;
+        const VERTICES_IDS = [0, 1, 2, 3]; 
+        const scaleFactor = 90 / 400; 
+        const verticesData = [
+            { id: 0, x: 120 * scaleFactor, y: 80 * scaleFactor },
+            { id: 1, x: 400 * scaleFactor, y: 60 * scaleFactor },
+            { id: 2, x: 340 * scaleFactor, y: 320 * scaleFactor },
+            { id: 3, x: 80 * scaleFactor, y: 280 * scaleFactor }
+        ];
+
+        let selectedPairId = null; 
+        let matchedPairsCount = 0; 
+        let matches = {}; 
+        let isGameOver = false;
+
+        const pairsCol = document.getElementById('pairs-col');
+        const edgesCol = document.getElementById('edges-col');
+        const statusMessage = document.getElementById('status-message');
+        const resetBtn = document.getElementById('reset-btn');
+        const mappingSvg = document.getElementById('mapping-svg');
+        const gameWrapper = document.getElementById('game-wrapper');
+
+        function initGame() {
+            generatePairBoxes();
+            generateEdgeBoxes();
+            
+            const resizeObserver = new ResizeObserver(() => {
+                const rect = gameWrapper.getBoundingClientRect();
+                mappingSvg.setAttribute('width', rect.width);
+                mappingSvg.setAttribute('height', rect.height);
+            });
+            resizeObserver.observe(gameWrapper);
+
+            resetBtn.addEventListener('click', () => location.reload());
+            resetBtn.style.display = 'block';
+        }
+
+        function generateCanonicalEdgeId(u, v) {
+            return `${Math.min(u, v)}-${Math.max(u, v)}`;
+        }
+
+        function generatePairBoxes() {
+            let pairIndex = 0;
+            for (let u of VERTICES_IDS) {
+                for (let v of VERTICES_IDS) {
+                    if (u !== v) {
+                        const box = createBox('pair', pairIndex, u, v);
+                        pairsCol.appendChild(box);
+                        pairIndex++;
+                    }
+                }
+            }
+        }
+
+        function generateEdgeBoxes() {
+            let edgeIndex = 0;
+            for (let i = 0; i < VERTICES_IDS.length; i++) {
+                for (let j = i + 1; j < VERTICES_IDS.length; j++) {
+                    const u = VERTICES_IDS[i];
+                    const v = VERTICES_IDS[j];
+                    const canonicalId = generateCanonicalEdgeId(u, v);
+                    const box = createBox('edge', edgeIndex, u, v, canonicalId);
+                    
+                    // Add Hover Events for game end
+                    box.onmouseenter = () => toggleMappingHighlight(canonicalId, true);
+                    box.onmouseleave = () => toggleMappingHighlight(canonicalId, false);
+
+                    edgesCol.appendChild(box);
+                    matches[canonicalId] = []; 
+                    edgeIndex++;
+                }
+            }
+        }
+
+        function createBox(type, index, u, v, canonicalId = null) {
+            const box = document.createElement('div');
+            box.className = type === 'pair' ? 'pair-box' : 'edge-box';
+            box.dataset.index = index;
+            box.dataset.u = u;
+            box.dataset.v = v;
+            box.id = `${type}-${index}`;
+            box.innerHTML = `<svg class="mini-svg" viewBox="0 0 100 100">${drawMiniPolygon(u, v, type)}</svg>`;
+            
+            if (type === 'pair') {
+                box.dataset.canonicalId = generateCanonicalEdgeId(u, v);
+                box.onclick = () => handlePairSelect(box, index);
+            } else { 
+                box.dataset.canonicalId = canonicalId;
+                box.onclick = () => handleEdgeSelect(box);
+            }
+            return box;
+        }
+        
+        function drawMiniPolygon(u, v, type) {
+            let svgContent = '';
+            for (let i = 0; i < VERTICES_IDS.length; i++) {
+                for (let j = i + 1; j < VERTICES_IDS.length; j++) {
+                    const p1 = verticesData[i], p2 = verticesData[j];
+                    const isTarget = (i === Math.min(u,v) && j === Math.max(u,v));
+                    svgContent += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" class="mini-edge ${type === 'edge' && isTarget ? 'highlight-edge' : ''}" />`;
+                }
+            }
+            for (let i of VERTICES_IDS) {
+                const p = verticesData[i];
+                let vClass = 'mini-vertex' + (type === 'pair' ? (i === u ? ' highlight-u' : (i === v ? ' highlight-v' : '')) : '');
+                svgContent += `<circle cx="${p.x}" cy="${p.y}" r="4" class="${vClass}" />`;
+            }
+            return svgContent;
+        }
+
+        function drawArrow(sourceId, targetId, pIdx) {
+            const sRect = document.getElementById(sourceId).getBoundingClientRect();
+            const tRect = document.getElementById(targetId).getBoundingClientRect();
+            const wRect = gameWrapper.getBoundingClientRect();
+
+            const startX = sRect.right - wRect.left, startY = sRect.top + sRect.height/2 - wRect.top;
+            const endX = tRect.left - wRect.left, endY = tRect.top + tRect.height/2 - wRect.top;
+            const ctrlX = startX + (endX - startX) * 0.5;
+
+            const arrow = document.createElementNS(SVG_NS, 'path');
+            arrow.setAttribute('d', `M ${startX} ${startY} C ${ctrlX} ${startY}, ${ctrlX} ${endY}, ${endX - 8} ${endY}`);
+            arrow.classList.add('match-arrow');
+            arrow.id = `arrow-p${pIdx}`;
+            mappingSvg.appendChild(arrow);
+        }
+
+        function handlePairSelect(box, id) {
+            if (box.classList.contains('matched-target')) return;
+            document.querySelectorAll('.pair-box').forEach(b => b.classList.remove('selected'));
+            selectedPairId = id;
+            box.classList.add('selected');
+        }
+
+        function handleEdgeSelect(edgeBox) {
+            if (selectedPairId === null) return;
+            const pairBox = document.querySelector(`.pair-box[data-index="${selectedPairId}"]`);
+            if (pairBox.dataset.canonicalId === edgeBox.dataset.canonicalId) {
+                drawArrow(`pair-${selectedPairId}`, edgeBox.id, selectedPairId);
+                pairBox.classList.remove('selected');
+                pairBox.classList.add('matched-target');
+                matches[edgeBox.dataset.canonicalId].push(selectedPairId);
+                matchedPairsCount++;
+                if (matches[edgeBox.dataset.canonicalId].length === 2) edgeBox.classList.add('matched');
+                selectedPairId = null;
+                if (matchedPairsCount === TOTAL_PAIRS) endGame();
+            } else {
+                setStatus("!بیشتر دقت کن", "error", 800);
+            }
+        }
+
+        function toggleMappingHighlight(canonicalId, isActive) {
+            if (!isGameOver) return;
+            const pIndices = matches[canonicalId];
+            pIndices.forEach(idx => {
+                const pBox = document.querySelector(`.pair-box[data-index="${idx}"]`);
+                const arrow = document.getElementById(`arrow-p${idx}`);
+                if (isActive) {
+                    pBox.classList.add('hover-highlight');
+                    arrow.style.opacity = "1";
+                    arrow.style.strokeWidth = "4";
+                    arrow.style.stroke = "var(--u-color)";
+                } else {
+                    pBox.classList.remove('hover-highlight');
+                    arrow.style.opacity = "0.6";
+                    arrow.style.strokeWidth = "2";
+                    arrow.style.stroke = "var(--u-color)";
+                }
+            });
+        }
+
+        function endGame() {
+            isGameOver = true;
+            setStatus("درسته! حالا ماوس رو روی هر کدوم از یال‌ها ببر تا جفت‌های مربوط به اون رو ببینی", "success");
+        }
+
+        function setStatus(text, type, latency=null) {
+            statusMessage.textContent = text;
+            statusMessage.style.color = type === 'success' ? 'var(--success)' : (type === 'error' ? 'var(--error)' : 'var(--text-main)');
+            if (latency) {
+                setTimeout(() => statusMessage.textContent = "", latency);
+            }
+        }
+
+        initGame();
+    </script>
+</body>
+</html>
