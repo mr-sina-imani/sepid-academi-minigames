@@ -2,9 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Combinatorial Redundancy Game</title>
-    <style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <style>
         :root {
             --bg-color: #f1f5f9;
             --text-main: #1e293b;
@@ -13,8 +11,8 @@
             --edge-idle: #cbd5e1;
             --edge-active: #475569; /* Dark Gray */
             --success: #10b981;
-            --error: #ef4444;
-            --warning: #f59e0b;
+            --error: #eabc03;
+            --warning: #14b017;
         }
 
         body {
@@ -41,6 +39,7 @@
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
             display: flex;
             flex-direction: column;
+            min-width: 750px;
             align-items: center;
         }
 
@@ -101,24 +100,17 @@
     </style>
 </head>
 <body>
-
-    <h1>Symmetry & Redundancy</h1>
-    <p>
-        In combinatorics, the order often doesn't matter. <br>
-        Find the edge $\{u, v\}$ in <strong>Round 1</strong>. Then, in <strong>Round 2</strong>, find the <em>exact same edge</em> using a different selection order.
-    </p>
-
     <div id="game-container">
         <svg id="polygon-svg" width="500" height="400"></svg>
 
-        <div id="status-bar" class="status-normal">Round 1: Select a pair (u, v)...</div>
+        <div id="status-bar" class="status-normal" dir="rtl">دور اول: یک مدیر و معاون انتخاب کن...</div>
         <div id="hint-text" class="hint"></div>
     </div>
 
     <script>
         // --- Configuration ---
         const SVG_NS = "http://www.w3.org/2000/svg";
-        const DELAY_MS = 500; 
+        const DELAY_MS = 250; 
 
         // Irregular Convex Quadrilateral
         const verticesData = [
@@ -193,7 +185,7 @@
             updateVertexVisuals(id, currentSelection.length);
 
             if (currentSelection.length === 1) {
-                setStatus(`Selected Vertex ${id + 1}... Pick one more.`, 'normal');
+                setStatus(`مدیر انتخاب شد. حالا معاون!`, 'normal');
             } 
             else if (currentSelection.length === 2) {
                 isLocked = true; // Lock input during hesitation/processing
@@ -215,8 +207,8 @@
                 edgeEl.classList.add('active'); // Highlight Edge
                 round1Pair = [u, v]; // Save the order
                 
-                setStatus("Edge Found! Press [SPACE] to start Round 2.", "success");
-                hintText.textContent = "Round 2 will ask for the redundant pair.";
+                setStatus("تیم تشکیل شد! حالا Space رو بزن تا انتخاب بعدی رو انجام بدی", "success");
+                hintText.textContent = "";
                 
                 // Note: We stay locked until Space is pressed
             } 
@@ -228,20 +220,20 @@
                                    (u === round1Pair[1] && v === round1Pair[0]);
 
                 if (!isSameEdge) {
-                    handleRound2Error("That's a different edge! We need the SAME edge.");
+                    handleRound2Error("این یک تیم دیگه‌ست. یه کاری کن که همون تیم ۲ نفره ی قبلی تشکیل بشه");
                     return;
                 }
 
                 // 2. Check if they used the EXACT same order (redundancy check)
                 if (u === round1Pair[0] && v === round1Pair[1]) {
-                    handleRound2Error("That is the exact same order! Try the reverse order.");
+                    handleRound2Error("این که همون قبلیه! یک مدیر و معاون جدید انتخاب کن");
                     return;
                 }
 
                 // 3. Success: Same edge, different order (u == v_old && v == u_old)
                 edgeEl.classList.add('success'); // Turn Green
-                setStatus("Correct! (v, u) maps to the same edge as (u, v).", "success");
-                hintText.textContent = "You have discovered why we divide by 2!";
+                setStatus("درسته! این مدیر و معاون هم همون تیم رو مشخص می‌کنن!", "success");
+                hintText.textContent = "";
                 gamePhase = 3; // End Game
             }
         }
@@ -255,8 +247,8 @@
                 resetVertexVisuals(); 
                 currentSelection = [];
                 isLocked = false; 
-                setStatus("Round 2: Try again. Find the REVERSE pair.", "warning");
-            }, 1500);
+                setStatus("دوباره تلاش کن. (همون آدما رو با ترتیب برعکس امتحان کن!)", "warning");
+            }, 5000);
         }
 
         function handleKeyInput(e) {
@@ -279,8 +271,8 @@
             resetVertexVisuals(); // Clear blue/red dots
             // Note: The Edge stays 'active' (gray) from Round 1 so they know the target
             
-            setStatus("Round 2: Select the SAME edge using the OPPOSITE order.", "warning");
-            hintText.textContent = `Previous selection was (${round1Pair[0]+1}, ${round1Pair[1]+1}).`;
+            setStatus("دور دوم: مدیر و معاون جدید رو جوری انتخاب کن که همون تیم قبلی تشکیل بشه", "warning");
+            hintText.textContent = ``;
         }
 
         // --- Visual Helpers ---

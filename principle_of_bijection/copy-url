@@ -1,0 +1,1 @@
+echo "https://mr-sina-imani.github.io/sepid-academi-minigames/principle_of_bijection/$1" | xclip -selection clipboard
